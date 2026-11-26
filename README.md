@@ -55,21 +55,19 @@
 
 在岩石力学莫尔圆坐标系中，规定**挤压为正**。引入孔隙水压 $P$ 后，有效主应力为 $\sigma_i' = \sigma_i - P$。
 
-- **二维断层切面受力**：
+**二维断层切面受力**：
 
-  $$
-  \sigma_n' = \frac{\sigma_1' + \sigma_3'}{2} + \frac{\sigma_1' - \sigma_3'}{2}\cos(2\theta), \qquad \tau = \frac{\sigma_1' - \sigma_3'}{2}\sin(2\theta)
-  $$
+```math
+\sigma_n' = \frac{\sigma_1' + \sigma_3'}{2} + \frac{\sigma_1' - \sigma_3'}{2}\cos(2\theta), \qquad \tau = \frac{\sigma_1' - \sigma_3'}{2}\sin(2\theta)
+```
 
-- **三维断层切面受力**（主轴法向量为 $(n_1, n_2, n_3)$）：
+**三维断层切面受力**（主轴法向量为 $(n_1, n_2, n_3)$）：
 
-  $$
-  \sigma_n' = \sigma_1' n_1^2 + \sigma_2' n_2^2 + \sigma_3' n_3^2, \qquad \tau = \sqrt{(\sigma_1' n_1)^2 + (\sigma_2' n_2)^2 + (\sigma_3' n_3)^2 - (\sigma_n')^2}
-  $$
+```math
+\sigma_n' = \sigma_1' n_1^2 + \sigma_2' n_2^2 + \sigma_3' n_3^2, \qquad \tau = \sqrt{(\sigma_1' n_1)^2 + (\sigma_2' n_2)^2 + (\sigma_3' n_3)^2 - (\sigma_n')^2}
+```
 
-- **破裂判定**：当库仑应力裕度 $CFS = \tau - (c + \mu \sigma_n') \ge 0$ 时，断层达到破裂极限。
-
-  
+**破裂判定**：当库仑应力裕度 $CFS = \tau - (c + \mu \sigma_n') \ge 0$ 时，断层达到破裂极限。
 ### 2. 静态库仑破裂应力变化（模块 3）
 
 在地震学应力触发分析中，采用习惯符号约定：**剪应力变化** $\Delta \tau$ **沿接收断层滑动方向为正，正应力变化** $\Delta \sigma_n$ **以拉张（松绑）为正**：
