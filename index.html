@@ -1,0 +1,2402 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>应力莫尔圆与三维库仑应力交互实验室</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Three.js r128 & OrbitControls -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'PingFang SC', 'Microsoft YaHei', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'Fira Code', 'ui-monospace', 'monospace'],
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      background-color: #020617;
+      color: #e2e8f0;
+      overflow-x: hidden;
+    }
+    /* 自定义深色滚动条 */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+    /* 自定义滑块样式 */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      background: #1e293b;
+      border-radius: 9999px;
+      outline: none;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #38bdf8;
+      border: 2px solid #0f172a;
+      box-shadow: 0 0 8px rgba(56, 189, 248, 0.65);
+      transition: transform 0.12s ease, background-color 0.12s ease;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+      background: #7dd3fc;
+    }
+    input[type="range"].slider-red::-webkit-slider-thumb { background: #f87171; box-shadow: 0 0 8px rgba(248, 113, 113, 0.65); }
+    input[type="range"].slider-green::-webkit-slider-thumb { background: #34d399; box-shadow: 0 0 8px rgba(52, 211, 153, 0.65); }
+    input[type="range"].slider-amber::-webkit-slider-thumb { background: #fbbf24; box-shadow: 0 0 8px rgba(251, 191, 36, 0.65); }
+    input[type="range"].slider-purple::-webkit-slider-thumb { background: #a78bfa; box-shadow: 0 0 8px rgba(167, 139, 250, 0.65); }
+
+    /* 发光数据卡片 */
+    .glow-card {
+      background: linear-gradient(145deg, rgba(15, 23, 42, 0.95), rgba(15, 23, 42, 0.72));
+      border: 1px solid rgba(51, 65, 85, 0.8);
+      box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    }
+    .tab-btn-active {
+      background: linear-gradient(135deg, rgba(14, 165, 233, 0.22), rgba(59, 130, 246, 0.14));
+      border-color: rgba(56, 189, 248, 0.65);
+      color: #f8fafc;
+      box-shadow: 0 0 16px rgba(14, 165, 233, 0.2);
+    }
+    details summary::-webkit-details-marker { display: none; }
+    details[open] summary .chevron { transform: rotate(180deg); }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col font-sans selection:bg-sky-500/30">
+
+  <!-- 顶部导航栏 -->
+  <header class="sticky top-0 z-30 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/90 px-4 py-3">
+    <div class="max-w-[1680px] mx-auto flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
+      <!-- 标题区 -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500/20 to-indigo-500/20 border border-sky-400/40 flex items-center justify-center shrink-0 shadow-lg shadow-sky-950/50">
+          <svg class="w-6 h-6 text-sky-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <circle cx="12" cy="14" r="6" />
+            <path d="M3 14h18" stroke-dasharray="2 2" opacity="0.5"/>
+            <path d="M4 17L20 5" stroke="#f87171" stroke-width="2"/>
+            <circle cx="15.5" cy="9.2" r="2" fill="#f87171" stroke="none"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-lg sm:text-xl font-bold tracking-tight text-slate-100">
+            应力莫尔圆与三维库仑应力交互实验室
+          </h1>
+          <p class="text-xs text-slate-400">
+            Geophysics &amp; Rock Mechanics Interactive Lab · 2D/3D Mohr Circle &amp; 3D ΔCFS
+          </p>
+        </div>
+      </div>
+
+      <!-- 模块切换标签页 -->
+      <nav class="flex flex-wrap items-center gap-2 w-full lg:w-auto" role="tablist">
+        <button id="btn-tab-mohr2d" onclick="App.switchTab('mohr2d')"
+          class="tab-btn tab-btn-active flex-1 lg:flex-none px-3.5 py-2 rounded-xl border border-slate-800 text-xs sm:text-sm font-medium text-slate-300 hover:text-white hover:border-slate-700 transition-all">
+          <span class="text-sky-400 font-mono mr-1">01</span>二维莫尔圆与断层切面
+        </button>
+        <button id="btn-tab-mohr3d" onclick="App.switchTab('mohr3d')"
+          class="tab-btn flex-1 lg:flex-none px-3.5 py-2 rounded-xl border border-slate-800 bg-slate-900/60 text-xs sm:text-sm font-medium text-slate-300 hover:text-white hover:border-slate-700 transition-all">
+          <span class="text-emerald-400 font-mono mr-1">02</span>三维莫尔圆与块体受力
+        </button>
+        <button id="btn-tab-coulomb3d" onclick="App.switchTab('coulomb3d')"
+          class="tab-btn flex-1 lg:flex-none px-3.5 py-2 rounded-xl border border-slate-800 bg-slate-900/60 text-xs sm:text-sm font-medium text-slate-300 hover:text-white hover:border-slate-700 transition-all">
+          <span class="text-rose-400 font-mono mr-1">03</span>三维空间库仑应力触发 ΔCFS
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- 主内容容器 -->
+  <main class="flex-1 max-w-[1680px] w-full mx-auto p-3 sm:p-4">
+
+    <!-- =================================================================== -->
+    <!-- 模块 1：二维应力莫尔圆与断层切面 (2D Mohr & Fault)                     -->
+    <!-- =================================================================== -->
+    <section id="tab-mohr2d" class="grid grid-cols-1 xl:grid-cols-12 gap-4">
+      <!-- 左侧控制面板 -->
+      <aside class="xl:col-span-3 glow-card rounded-2xl p-4 flex flex-col gap-4">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+          <h2 class="text-sm font-semibold text-slate-100 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-sky-400"></span>二维应力与断层参数
+          </h2>
+          <span class="text-[11px] font-mono text-slate-400">2D Mohr</span>
+        </div>
+
+        <!-- 快捷预设 -->
+        <div>
+          <p class="text-xs text-slate-400 mb-2">快捷物理情景预设</p>
+          <div class="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-1 gap-1.5">
+            <button onclick="Mohr2D.applyPreset('safe')" class="px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-sky-500/20 border border-slate-700 hover:border-sky-500/50 text-xs text-left flex items-center justify-between transition">
+              <span>安全稳定状态</span><span class="text-[10px] text-emerald-400 font-mono">SAFE</span>
+            </button>
+            <button onclick="Mohr2D.applyPreset('critical')" class="px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-rose-500/20 border border-slate-700 hover:border-rose-500/50 text-xs text-left flex items-center justify-between transition">
+              <span>临界破裂状态</span><span class="text-[10px] text-rose-400 font-mono">CRITICAL</span>
+            </button>
+            <button onclick="Mohr2D.applyPreset('injection')" class="px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-amber-500/20 border border-slate-700 hover:border-amber-500/50 text-xs text-left flex items-center justify-between transition">
+              <span>注水诱发地震 (高孔隙压)</span><span class="text-[10px] text-amber-400 font-mono">HIGH P</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 滑块组 -->
+        <div class="space-y-3.5 text-xs">
+          <div>
+            <div class="flex justify-between mb-1">
+              <label class="text-slate-300">最大主应力 σ₁</label>
+              <span id="m2d-val-s1" class="font-mono text-rose-400 font-semibold">80 MPa</span>
+            </div>
+            <input id="m2d-s1" type="range" min="20" max="150" step="1" value="80" class="slider-red" />
+          </div>
+
+          <div>
+            <div class="flex justify-between mb-1">
+              <label class="text-slate-300">最小主应力 σ₃ <span class="text-slate-500">(σ₃ &lt; σ₁)</span></label>
+              <span id="m2d-val-s3" class="font-mono text-sky-400 font-semibold">30 MPa</span>
+            </div>
+            <input id="m2d-s3" type="range" min="0" max="100" step="1" value="30" />
+          </div>
+
+          <div>
+            <div class="flex justify-between mb-1">
+              <label class="text-slate-300">孔隙水压 P <span class="text-slate-500">(左移莫尔圆)</span></label>
+              <span id="m2d-val-p" class="font-mono text-cyan-300 font-semibold">0 MPa</span>
+            </div>
+            <input id="m2d-p" type="range" min="0" max="60" step="1" value="0" />
+          </div>
+
+          <div class="border-t border-slate-800/80 pt-3">
+            <div class="flex justify-between mb-1">
+              <label class="text-slate-300">岩石黏聚力 c</label>
+              <span id="m2d-val-c" class="font-mono text-slate-200 font-semibold">10.0 MPa</span>
+            </div>
+            <input id="m2d-c" type="range" min="0" max="30" step="0.5" value="10" class="slider-purple" />
+          </div>
+
+          <div>
+            <div class="flex justify-between mb-1">
+              <label class="text-slate-300">内摩擦系数 μ <span class="text-slate-500">(tan φ)</span></label>
+              <span id="m2d-val-mu" class="font-mono text-slate-200 font-semibold">0.60</span>
+            </div>
+            <input id="m2d-mu" type="range" min="0.1" max="1.2" step="0.02" value="0.6" class="slider-purple" />
+          </div>
+
+          <div class="border-t border-slate-800/80 pt-3">
+            <div class="flex justify-between mb-1">
+              <label class="text-slate-300">断层法线与 σ₁ 夹角 θ</label>
+              <span id="m2d-val-theta" class="font-mono text-amber-400 font-semibold">60°</span>
+            </div>
+            <input id="m2d-theta" type="range" min="0" max="90" step="1" value="60" class="slider-amber" />
+            <p class="text-[11px] text-slate-500 mt-1">莫尔圆上对应圆心角为 2θ = <span id="m2d-val-2theta" class="font-mono text-amber-300">120°</span></p>
+          </div>
+        </div>
+
+        <div class="mt-auto rounded-xl bg-slate-950/70 border border-slate-800 p-3 text-[11px] text-slate-400 leading-relaxed">
+          <strong class="text-slate-200">公式提示：</strong><br/>
+          σ<sub>n</sub>' = (σ₁'+σ₃')/2 + (σ₁'-σ₃')/2 · cos(2θ)<br/>
+          τ = (σ₁'-σ₃')/2 · sin(2θ)<br/>
+          CFS = τ - (c + μ·σ<sub>n</sub>') ≥ 0 即触发破裂
+        </div>
+      </aside>
+
+      <!-- 右侧主视图区 -->
+      <div class="xl:col-span-9 flex flex-col gap-4">
+        <!-- 双画布视图 -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          <!-- 左：二维岩石块体 -->
+          <div class="lg:col-span-5 glow-card rounded-2xl p-3 flex flex-col">
+            <div class="flex items-center justify-between mb-2 px-1">
+              <h3 class="text-xs font-semibold text-slate-200">二维岩石块体与断层切面受力</h3>
+              <span class="text-[11px] text-slate-400">σ₁ 垂直挤压 · σ₃ 水平围压</span>
+            </div>
+            <div id="m2d-block-wrap" class="relative w-full h-[360px] sm:h-[400px] rounded-xl bg-slate-950/90 border border-slate-800/80 overflow-hidden">
+              <canvas id="m2d-block-canvas" class="w-full h-full block"></canvas>
+            </div>
+          </div>
+
+          <!-- 右：二维莫尔圆 -->
+          <div class="lg:col-span-7 glow-card rounded-2xl p-3 flex flex-col">
+            <div class="flex items-center justify-between mb-2 px-1">
+              <h3 class="text-xs font-semibold text-slate-200">二维莫尔圆与库仑破裂包络线</h3>
+              <span class="text-[11px] text-slate-400">横轴 σ' (MPa) · 纵轴 τ (MPa)</span>
+            </div>
+            <div id="m2d-mohr-wrap" class="relative w-full h-[360px] sm:h-[400px] rounded-xl bg-slate-950/90 border border-slate-800/80 overflow-hidden">
+              <canvas id="m2d-mohr-canvas" class="w-full h-full block"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- 底部实时数据卡片 -->
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div class="glow-card rounded-xl p-3">
+            <p class="text-[11px] text-slate-400">有效正应力 σ<sub>n</sub>'</p>
+            <p id="m2d-out-sn" class="text-lg font-mono font-bold text-sky-400 mt-0.5">42.5 MPa</p>
+          </div>
+          <div class="glow-card rounded-xl p-3">
+            <p class="text-[11px] text-slate-400">断层面剪应力 τ</p>
+            <p id="m2d-out-tau" class="text-lg font-mono font-bold text-amber-400 mt-0.5">21.7 MPa</p>
+          </div>
+          <div class="glow-card rounded-xl p-3">
+            <p class="text-[11px] text-slate-400">库仑破裂极限 τ<sub>f</sub></p>
+            <p id="m2d-out-tf" class="text-lg font-mono font-bold text-rose-400 mt-0.5">35.5 MPa</p>
+          </div>
+          <div class="glow-card rounded-xl p-3">
+            <p class="text-[11px] text-slate-400">库仑应力裕度 CFS</p>
+            <p id="m2d-out-cfs" class="text-lg font-mono font-bold text-emerald-400 mt-0.5">-13.8 MPa</p>
+          </div>
+          <div class="col-span-2 sm:col-span-1 glow-card rounded-xl p-3 flex flex-col justify-between">
+            <p class="text-[11px] text-slate-400">断层稳定性判定</p>
+            <div id="m2d-out-status" class="mt-1 inline-flex items-center justify-center px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+              安全稳定
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- 模块 2：三维应力莫尔圆与三维块体受力 (3D Mohr & 3D Block)               -->
+    <!-- =================================================================== -->
+    <section id="tab-mohr3d" class="hidden grid-cols-1 xl:grid-cols-12 gap-4">
+      <!-- 左侧控制面板 -->
+      <aside class="xl:col-span-3 glow-card rounded-2xl p-4 flex flex-col gap-3.5">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+          <h2 class="text-sm font-semibold text-slate-100 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>三维主应力与断层产状
+          </h2>
+          <span class="text-[11px] font-mono text-slate-400">3D Mohr</span>
+        </div>
+
+        <!-- 安德森应力场预设 -->
+        <div>
+          <p class="text-xs text-slate-400 mb-2">安德森构造应力场预设</p>
+          <div class="grid grid-cols-1 gap-1.5">
+            <button onclick="Mohr3D.applyPreset('normal')" id="m3d-btn-normal" class="px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-sky-500/20 border border-slate-700 text-xs text-left flex items-center justify-between transition">
+              <span>正断层应力场 (σ₁ 垂直)</span><span class="text-[10px] text-sky-400 font-mono">NORMAL</span>
+            </button>
+            <button onclick="Mohr3D.applyPreset('reverse')" id="m3d-btn-reverse" class="px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-rose-500/20 border border-slate-700 text-xs text-left flex items-center justify-between transition">
+              <span>逆断层应力场 (σ₃ 垂直)</span><span class="text-[10px] text-rose-400 font-mono">REVERSE</span>
+            </button>
+            <button onclick="Mohr3D.applyPreset('strike')" id="m3d-btn-strike" class="px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-emerald-500/20 border border-slate-700 text-xs text-left flex items-center justify-between transition">
+              <span>走滑应力场 (σ₂ 垂直)</span><span class="text-[10px] text-emerald-400 font-mono">STRIKE</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 三维主应力滑块 -->
+        <div class="space-y-3 text-xs">
+          <div>
+            <div class="flex justify-between mb-1">
+              <label class="text-slate-300">最大主应力 σ₁ <span class="text-rose-400">(红)</span></label>
+              <span id="m3d-val-s1" class="font-mono text-rose-400 font-semibold">100 MPa</span>
+            </div>
+            <input id="m3d-s1" type="range" min="30" max="150" step="1" value="100" class="slider-red" />
+          </div>
+          <div>
+            <div class="flex justify-between mb-1">
+              <label class="text-slate-300">中间主应力 σ₂ <span class="text-emerald-400">(绿)</span></label>
+              <span id="m3d-val-s2" class="font-mono text-emerald-400 font-semibold">65 MPa</span>
+            </div>
+            <input id="m3d-s2" type="range" min="15" max="140" step="1" value="65" class="slider-green" />
+          </div>
+          <div>
+            <div class="flex justify-between mb-1">
+              <label class="text-slate-300">最小主应力 σ₃ <span class="text-sky-400">(蓝)</span></label>
+              <span id="m3d-val-s3" class="font-mono text-sky-400 font-semibold">30 MPa</span>
+            </div>
+            <input id="m3d-s3" type="range" min="5" max="120" step="1" value="30" />
+          </div>
+          <div>
+            <div class="flex justify-between mb-1">
+              <label class="text-slate-300">孔隙水压 P</label>
+              <span id="m3d-val-p" class="font-mono text-cyan-300 font-semibold">10 MPa</span>
+            </div>
+            <input id="m3d-p" type="range" min="0" max="60" step="1" value="10" />
+          </div>
+
+          <div class="grid grid-cols-2 gap-2.5 border-t border-slate-800/80 pt-2.5">
+            <div>
+              <div class="flex justify-between mb-1">
+                <label class="text-slate-300">黏聚力 c</label>
+                <span id="m3d-val-c" class="font-mono text-slate-200">8</span>
+              </div>
+              <input id="m3d-c" type="range" min="0" max="30" step="0.5" value="8" class="slider-purple" />
+            </div>
+            <div>
+              <div class="flex justify-between mb-1">
+                <label class="text-slate-300">摩擦 μ</label>
+                <span id="m3d-val-mu" class="font-mono text-slate-200">0.60</span>
+              </div>
+              <input id="m3d-mu" type="range" min="0.1" max="1.2" step="0.02" value="0.6" class="slider-purple" />
+            </div>
+          </div>
+
+          <div class="border-t border-slate-800/80 pt-2.5 space-y-2.5">
+            <div>
+              <div class="flex justify-between mb-1">
+                <label class="text-slate-300">断层走向 Strike (北偏东)</label>
+                <span id="m3d-val-strike" class="font-mono text-amber-400 font-semibold">25°</span>
+              </div>
+              <input id="m3d-strike" type="range" min="0" max="360" step="1" value="25" class="slider-amber" />
+            </div>
+            <div>
+              <div class="flex justify-between mb-1">
+                <label class="text-slate-300">断层倾角 Dip</label>
+                <span id="m3d-val-dip" class="font-mono text-amber-400 font-semibold">60°</span>
+              </div>
+              <input id="m3d-dip" type="range" min="0" max="90" step="1" value="60" class="slider-amber" />
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- 右侧主视图区 -->
+      <div class="xl:col-span-9 flex flex-col gap-4">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          <!-- 左：Three.js 三维块体受力 -->
+          <div class="lg:col-span-6 glow-card rounded-2xl p-3 flex flex-col">
+            <div class="flex items-center justify-between mb-2 px-1">
+              <h3 class="text-xs font-semibold text-slate-200">三维岩石块体与内部断层切面</h3>
+              <div class="flex items-center gap-2">
+                <span id="m3d-regime-badge" class="text-[10px] font-mono px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30">σ₁ 垂直 (正断层)</span>
+                <button onclick="Mohr3D.resetCamera()" class="text-[11px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition">重置视角</button>
+              </div>
+            </div>
+            <div id="m3d-three-wrap" class="relative w-full h-[380px] sm:h-[420px] rounded-xl bg-slate-950 border border-slate-800/80 overflow-hidden cursor-grab active:cursor-grabbing">
+              <div class="absolute bottom-2.5 left-2.5 z-10 pointer-events-none bg-slate-950/75 backdrop-blur px-2.5 py-1.5 rounded-lg border border-slate-800 text-[10px] text-slate-300 flex flex-wrap gap-x-3 gap-y-1">
+                <span><span class="inline-block w-2 h-2 rounded-full bg-rose-500 mr-1"></span>σ₁</span>
+                <span><span class="inline-block w-2 h-2 rounded-full bg-emerald-400 mr-1"></span>σ₂</span>
+                <span><span class="inline-block w-2 h-2 rounded-full bg-sky-400 mr-1"></span>σ₃</span>
+                <span><span class="inline-block w-2 h-2 rounded-full bg-cyan-300 mr-1"></span>法向 n</span>
+                <span><span class="inline-block w-2 h-2 rounded-full bg-amber-400 mr-1"></span>最大剪应力 τ</span>
+              </div>
+              <div class="absolute top-2.5 left-2.5 z-10 pointer-events-none text-[10px] text-slate-500">
+                左键旋转 · 滚轮缩放 · 右键平移
+              </div>
+            </div>
+          </div>
+
+          <!-- 右：三维莫尔圆 -->
+          <div class="lg:col-span-6 glow-card rounded-2xl p-3 flex flex-col">
+            <div class="flex items-center justify-between mb-2 px-1">
+              <h3 class="text-xs font-semibold text-slate-200">三维莫尔圆 (月牙形合法应力域)</h3>
+              <button onclick="Mohr3D.clearTrail()" class="text-[11px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition">清除轨迹</button>
+            </div>
+            <div id="m3d-mohr-wrap" class="relative w-full h-[380px] sm:h-[420px] rounded-xl bg-slate-950/90 border border-slate-800/80 overflow-hidden">
+              <canvas id="m3d-mohr-canvas" class="w-full h-full block"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- 底部实时数据卡片 -->
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div class="glow-card rounded-xl p-3">
+            <p class="text-[11px] text-slate-400">主轴法向量 (n₁, n₂, n₃)</p>
+            <p id="m3d-out-n" class="text-xs sm:text-sm font-mono font-bold text-cyan-300 mt-1">(0.50, 0.37, 0.78)</p>
+          </div>
+          <div class="glow-card rounded-xl p-3">
+            <p class="text-[11px] text-slate-400">有效正应力 σ<sub>n</sub>'</p>
+            <p id="m3d-out-sn" class="text-lg font-mono font-bold text-sky-400 mt-0.5">42.1 MPa</p>
+          </div>
+          <div class="glow-card rounded-xl p-3">
+            <p class="text-[11px] text-slate-400">断层面剪应力 τ</p>
+            <p id="m3d-out-tau" class="text-lg font-mono font-bold text-amber-400 mt-0.5">29.4 MPa</p>
+          </div>
+          <div class="glow-card rounded-xl p-3">
+            <p class="text-[11px] text-slate-400">库仑应力裕度 CFS</p>
+            <p id="m3d-out-cfs" class="text-lg font-mono font-bold text-emerald-400 mt-0.5">-3.8 MPa</p>
+          </div>
+          <div class="col-span-2 sm:col-span-1 glow-card rounded-xl p-3 flex flex-col justify-between">
+            <p class="text-[11px] text-slate-400">破裂判定</p>
+            <div id="m3d-out-status" class="mt-1 inline-flex items-center justify-center px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+              安全稳定
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- 模块 3：三维空间库仑应力触发 ΔCFS (3D Coulomb Stress)                  -->
+    <!-- =================================================================== -->
+    <section id="tab-coulomb3d" class="hidden grid-cols-1 xl:grid-cols-12 gap-4">
+      <!-- 左侧可折叠控制面板 -->
+      <aside class="xl:col-span-3 glow-card rounded-2xl p-3.5 flex flex-col gap-3 max-h-[820px] overflow-y-auto">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+          <h2 class="text-sm font-semibold text-slate-100 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-rose-400"></span>三维断层应力触发参数
+          </h2>
+          <span class="text-[11px] font-mono text-slate-400">3D ΔCFS</span>
+        </div>
+
+        <!-- 地震案例预设 -->
+        <div>
+          <p class="text-[11px] text-slate-400 mb-1.5">典型地震触发案例预设</p>
+          <div class="grid grid-cols-3 gap-1.5">
+            <button onclick="Coulomb3D.applyPreset('strike-slip')" class="px-2 py-1.5 rounded-lg bg-slate-800/90 hover:bg-sky-500/20 border border-slate-700 hover:border-sky-500/50 text-[11px] font-medium transition">
+              走滑触发
+            </button>
+            <button onclick="Coulomb3D.applyPreset('reverse')" class="px-2 py-1.5 rounded-lg bg-slate-800/90 hover:bg-rose-500/20 border border-slate-700 hover:border-rose-500/50 text-[11px] font-medium transition">
+              逆冲触发
+            </button>
+            <button onclick="Coulomb3D.applyPreset('normal')" class="px-2 py-1.5 rounded-lg bg-slate-800/90 hover:bg-amber-500/20 border border-slate-700 hover:border-amber-500/50 text-[11px] font-medium transition">
+              正断触发
+            </button>
+          </div>
+        </div>
+
+        <!-- 折叠组 1：源断层 -->
+        <details open class="rounded-xl bg-slate-950/60 border border-slate-800 overflow-hidden">
+          <summary class="px-3 py-2.5 cursor-pointer flex items-center justify-between text-xs font-semibold text-slate-200 hover:bg-slate-800/40 select-none">
+            <span class="flex items-center gap-2"><span class="w-2 h-2 rounded-sm bg-white"></span>源断层 (Source Fault)</span>
+            <svg class="chevron w-4 h-4 text-slate-400 transition-transform" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
+          </summary>
+          <div class="px-3 pb-3 pt-1 space-y-2.5 text-xs border-t border-slate-800/70">
+            <div>
+              <div class="flex justify-between mb-0.5"><label class="text-slate-400">走向 Strike</label><span id="c3d-val-sStrike" class="font-mono text-slate-200">90°</span></div>
+              <input id="c3d-sStrike" type="range" min="0" max="360" step="1" value="90" />
+            </div>
+            <div>
+              <div class="flex justify-between mb-0.5"><label class="text-slate-400">倾角 Dip</label><span id="c3d-val-sDip" class="font-mono text-slate-200">90°</span></div>
+              <input id="c3d-sDip" type="range" min="10" max="90" step="1" value="90" />
+            </div>
+            <div>
+              <div class="flex justify-between mb-0.5"><label class="text-slate-400">滑动角 Rake</label><span id="c3d-val-sRake" class="font-mono text-amber-300">180°</span></div>
+              <input id="c3d-sRake" type="range" min="-180" max="180" step="5" value="180" class="slider-amber" />
+            </div>
+            <div>
+              <div class="flex justify-between mb-0.5"><label class="text-slate-400">滑动量 Slip</label><span id="c3d-val-sSlip" class="font-mono text-rose-400">3.0 m</span></div>
+              <input id="c3d-sSlip" type="range" min="0.5" max="8.0" step="0.1" value="3.0" class="slider-red" />
+            </div>
+            <div>
+              <div class="flex justify-between mb-0.5"><label class="text-slate-400">断层长度 L</label><span id="c3d-val-sLen" class="font-mono text-slate-200">20 km</span></div>
+              <input id="c3d-sLen" type="range" min="10" max="40" step="1" value="20" />
+            </div>
+          </div>
+        </details>
+
+        <!-- 折叠组 2：接收断层 -->
+        <details open class="rounded-xl bg-slate-950/60 border border-slate-800 overflow-hidden">
+          <summary class="px-3 py-2.5 cursor-pointer flex items-center justify-between text-xs font-semibold text-slate-200 hover:bg-slate-800/40 select-none">
+            <span class="flex items-center gap-2"><span class="w-2 h-2 rounded-sm bg-rose-400"></span>接收断层 (Receiver Fault)</span>
+            <svg class="chevron w-4 h-4 text-slate-400 transition-transform" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
+          </summary>
+          <div class="px-3 pb-3 pt-1 space-y-2.5 text-xs border-t border-slate-800/70">
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <div class="flex justify-between mb-0.5"><label class="text-slate-400">东向 X</label><span id="c3d-val-rX" class="font-mono text-sky-300">18 km</span></div>
+                <input id="c3d-rX" type="range" min="-30" max="30" step="1" value="18" />
+              </div>
+              <div>
+                <div class="flex justify-between mb-0.5"><label class="text-slate-400">北向 Y</label><span id="c3d-val-rY" class="font-mono text-sky-300">2 km</span></div>
+                <input id="c3d-rY" type="range" min="-30" max="30" step="1" value="2" />
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between mb-0.5"><label class="text-slate-400">中心深度 Z</label><span id="c3d-val-rZ" class="font-mono text-sky-300">8 km</span></div>
+              <input id="c3d-rZ" type="range" min="2" max="20" step="1" value="8" />
+            </div>
+            <div>
+              <div class="flex justify-between mb-0.5"><label class="text-slate-400">走向 Strike</label><span id="c3d-val-rStrike" class="font-mono text-slate-200">90°</span></div>
+              <input id="c3d-rStrike" type="range" min="0" max="360" step="1" value="90" />
+            </div>
+            <div>
+              <div class="flex justify-between mb-0.5"><label class="text-slate-400">倾角 Dip</label><span id="c3d-val-rDip" class="font-mono text-slate-200">90°</span></div>
+              <input id="c3d-rDip" type="range" min="10" max="90" step="1" value="90" />
+            </div>
+            <div>
+              <div class="flex justify-between mb-0.5"><label class="text-slate-400">滑动角 Rake</label><span id="c3d-val-rRake" class="font-mono text-amber-300">180°</span></div>
+              <input id="c3d-rRake" type="range" min="-180" max="180" step="5" value="180" class="slider-amber" />
+            </div>
+          </div>
+        </details>
+
+        <!-- 折叠组 3：介质与切片 -->
+        <details open class="rounded-xl bg-slate-950/60 border border-slate-800 overflow-hidden">
+          <summary class="px-3 py-2.5 cursor-pointer flex items-center justify-between text-xs font-semibold text-slate-200 hover:bg-slate-800/40 select-none">
+            <span class="flex items-center gap-2"><span class="w-2 h-2 rounded-sm bg-purple-400"></span>介质与水平应力切片</span>
+            <svg class="chevron w-4 h-4 text-slate-400 transition-transform" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
+          </summary>
+          <div class="px-3 pb-3 pt-1 space-y-2.5 text-xs border-t border-slate-800/70">
+            <div>
+              <div class="flex justify-between mb-0.5"><label class="text-slate-400">视摩擦系数 μ'</label><span id="c3d-val-mu" class="font-mono text-purple-300">0.40</span></div>
+              <input id="c3d-mu" type="range" min="0.0" max="0.8" step="0.05" value="0.4" class="slider-purple" />
+            </div>
+            <div>
+              <div class="flex justify-between mb-0.5"><label class="text-slate-400">水平切片深度 Slice Z</label><span id="c3d-val-sliceZ" class="font-mono text-purple-300">8 km</span></div>
+              <input id="c3d-sliceZ" type="range" min="2" max="20" step="1" value="8" class="slider-purple" />
+            </div>
+            <label class="flex items-center justify-between pt-1 cursor-pointer">
+              <span class="text-slate-300">显示水平库仑应力切片</span>
+              <input id="c3d-showSlice" type="checkbox" checked class="w-4 h-4 accent-sky-500 rounded cursor-pointer" />
+            </label>
+          </div>
+        </details>
+      </aside>
+
+      <!-- 右侧：3D 空间场景 + 实时分析面板 -->
+      <div class="xl:col-span-9 flex flex-col gap-4">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          <!-- 3D 空间场景 -->
+          <div class="lg:col-span-8 glow-card rounded-2xl p-3 flex flex-col">
+            <div class="flex items-center justify-between mb-2 px-1">
+              <h3 class="text-xs font-semibold text-slate-200">三维弹性地壳断层与库仑应力场 (ΔCFS)</h3>
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] text-slate-400 hidden sm:inline">东(+X) · 北(+Y) · 深度(Z)</span>
+                <button onclick="Coulomb3D.resetCamera()" class="text-[11px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition">重置视角</button>
+              </div>
+            </div>
+            <div id="c3d-three-wrap" class="relative w-full h-[430px] sm:h-[520px] rounded-xl bg-slate-950 border border-slate-800/80 overflow-hidden cursor-grab active:cursor-grabbing">
+              <!-- 色标图例 -->
+              <div class="absolute bottom-3 right-3 z-10 pointer-events-none bg-slate-950/85 backdrop-blur px-3 py-2 rounded-xl border border-slate-800">
+                <div class="text-[10px] text-slate-300 font-semibold mb-1 text-center">ΔCFS (bar)</div>
+                <div class="w-40 h-2.5 rounded-full" style="background: linear-gradient(90deg, #1d4ed8 0%, #60a5fa 25%, #f8fafc 50%, #fb923c 75%, #dc2626 100%);"></div>
+                <div class="flex justify-between text-[9px] font-mono text-slate-400 mt-1">
+                  <span>-2.0 (影区)</span>
+                  <span>0</span>
+                  <span>+2.0 (触发)</span>
+                </div>
+              </div>
+              <!-- 图例提示 -->
+              <div class="absolute top-3 left-3 z-10 pointer-events-none bg-slate-950/75 backdrop-blur px-2.5 py-1.5 rounded-lg border border-slate-800 text-[10px] text-slate-300 space-y-0.5">
+                <div><span class="inline-block w-2.5 h-2.5 rounded-sm bg-slate-200 border border-white mr-1.5 align-middle"></span>源断层 (黄箭头: 错动方向)</div>
+                <div><span class="inline-block w-2.5 h-2.5 rounded-sm bg-gradient-to-r from-blue-500 to-red-500 mr-1.5 align-middle"></span>接收断层 (表面按 ΔCFS 着色)</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 右侧实时分析仪表盘 -->
+          <div class="lg:col-span-4 flex flex-col gap-3">
+            <!-- 触发判定徽章与数值 -->
+            <div class="glow-card rounded-2xl p-4 flex flex-col gap-3">
+              <div class="flex items-center justify-between">
+                <h3 class="text-xs font-semibold text-slate-200">接收断层中心应力变化</h3>
+                <span class="text-[10px] font-mono text-slate-500">1 bar = 0.1 MPa</span>
+              </div>
+
+              <div id="c3d-risk-badge" class="rounded-xl px-3 py-2.5 text-center border bg-rose-500/15 border-rose-500/40 text-rose-300">
+                <div id="c3d-risk-title" class="text-sm font-bold">触发破裂风险增加 (应力加载)</div>
+                <div id="c3d-risk-sub" class="text-[11px] opacity-85 mt-0.5">ΔCFS &gt; +0.1 bar 已达显著触发阈值</div>
+              </div>
+
+              <div class="grid grid-cols-1 gap-2">
+                <div class="rounded-xl bg-slate-950/80 border border-slate-800 px-3 py-2 flex items-center justify-between">
+                  <div>
+                    <div class="text-[11px] text-slate-400">库仑应力变化 ΔCFS</div>
+                    <div class="text-[10px] text-slate-500">Δτ + μ'·Δσ<sub>n</sub></div>
+                  </div>
+                  <div class="text-right">
+                    <div id="c3d-out-cfs-bar" class="text-base font-mono font-bold text-rose-400">+1.42 bar</div>
+                    <div id="c3d-out-cfs-mpa" class="text-[10px] font-mono text-slate-400">+0.142 MPa</div>
+                  </div>
+                </div>
+
+                <div class="rounded-xl bg-slate-950/80 border border-slate-800 px-3 py-2 flex items-center justify-between">
+                  <div>
+                    <div class="text-[11px] text-slate-400">剪应力变化 Δτ</div>
+                    <div class="text-[10px] text-slate-500">沿接收断层滑动方向</div>
+                  </div>
+                  <div class="text-right">
+                    <div id="c3d-out-tau-bar" class="text-sm font-mono font-bold text-amber-400">+1.25 bar</div>
+                    <div id="c3d-out-tau-mpa" class="text-[10px] font-mono text-slate-400">+0.125 MPa</div>
+                  </div>
+                </div>
+
+                <div class="rounded-xl bg-slate-950/80 border border-slate-800 px-3 py-2 flex items-center justify-between">
+                  <div>
+                    <div class="text-[11px] text-slate-400">正应力变化 Δσ<sub>n</sub></div>
+                    <div class="text-[10px] text-slate-500">正值=拉张松绑 · 负值=挤压锁紧</div>
+                  </div>
+                  <div class="text-right">
+                    <div id="c3d-out-sn-bar" class="text-sm font-mono font-bold text-sky-400">+0.42 bar</div>
+                    <div id="c3d-out-sn-mpa" class="text-[10px] font-mono text-slate-400">+0.042 MPa</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 迷你莫尔空间应力转移示意图 -->
+            <div class="glow-card rounded-2xl p-3 flex-1 flex flex-col">
+              <div class="flex items-center justify-between mb-1.5 px-1">
+                <h3 class="text-xs font-semibold text-slate-200">莫尔空间应力转移示意</h3>
+                <span class="text-[10px] text-slate-400">靠近红线 = ΔCFS &gt; 0</span>
+              </div>
+              <div id="c3d-mini-wrap" class="relative w-full h-[210px] flex-1 rounded-xl bg-slate-950/90 border border-slate-800/80 overflow-hidden">
+                <canvas id="c3d-mini-canvas" class="w-full h-full block"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // =========================================================================
+    // 公共工具函数 (Canvas DPR 自适应、色谱映射、向量与角度运算)
+    // =========================================================================
+    const DEG2RAD = Math.PI / 180;
+
+    function setupCanvasDPR(canvas, container) {
+      const rect = container.getBoundingClientRect();
+      const w = Math.max(10, Math.floor(rect.width));
+      const h = Math.max(10, Math.floor(rect.height));
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      if (canvas.width !== Math.floor(w * dpr) || canvas.height !== Math.floor(h * dpr)) {
+        canvas.width = Math.floor(w * dpr);
+        canvas.height = Math.floor(h * dpr);
+      }
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      return { ctx, w, h };
+    }
+
+    // 发散红-白-蓝色标：val 范围 [-maxVal, +maxVal] -> RGB [0..1]
+    function divergingColorRGB(val, maxVal = 2.0) {
+      const t = Math.max(-1, Math.min(1, val / maxVal));
+      let r, g, b;
+      if (t >= 0) {
+        // 白 -> 橙 -> 深红
+        if (t < 0.5) {
+          const k = t * 2;
+          r = 0.97 + (0.98 - 0.97) * k;
+          g = 0.98 + (0.57 - 0.98) * k;
+          b = 0.99 + (0.24 - 0.99) * k;
+        } else {
+          const k = (t - 0.5) * 2;
+          r = 0.98 + (0.82 - 0.98) * k;
+          g = 0.57 + (0.11 - 0.57) * k;
+          b = 0.24 + (0.15 - 0.24) * k;
+        }
+      } else {
+        // 白 -> 浅蓝 -> 深蓝
+        const u = -t;
+        if (u < 0.5) {
+          const k = u * 2;
+          r = 0.97 + (0.38 - 0.97) * k;
+          g = 0.98 + (0.65 - 0.98) * k;
+          b = 0.99 + (0.98 - 0.99) * k;
+        } else {
+          const k = (u - 0.5) * 2;
+          r = 0.38 + (0.10 - 0.38) * k;
+          g = 0.65 + (0.28 - 0.65) * k;
+          b = 0.98 + (0.84 - 0.98) * k;
+        }
+      }
+      return [r, g, b];
+    }
+
+    // 创建 Three.js 文字 Sprite 标签
+    function createTextSprite(text, color = '#ffffff', bgColor = 'rgba(15,23,42,0.75)') {
+      const canvas = document.createElement('canvas');
+      canvas.width = 160;
+      canvas.height = 64;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = bgColor;
+      ctx.beginPath();
+      ctx.roundRect(12, 10, 136, 44, 12);
+      ctx.fill();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+      ctx.fillStyle = color;
+      ctx.font = 'bold 28px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, 80, 33);
+      const tex = new THREE.CanvasTexture(canvas);
+      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(0.65, 0.26, 1);
+      return sprite;
+    }
+
+    // 创建自定义 3D 粗箭头 (杆 + 锥头)，默认指向 +Y，原点在尾部
+    function createThickArrow(color, shaftRadius = 0.035, headRadius = 0.095, headLength = 0.24) {
+      const group = new THREE.Group();
+      const mat = new THREE.MeshStandardMaterial({
+        color,
+        emissive: color,
+        emissiveIntensity: 0.28,
+        roughness: 0.35,
+        metalness: 0.15
+      });
+      const shaftGeo = new THREE.CylinderGeometry(shaftRadius, shaftRadius, 1, 14);
+      shaftGeo.translate(0, 0.5, 0);
+      const shaft = new THREE.Mesh(shaftGeo, mat);
+
+      const headGeo = new THREE.ConeGeometry(headRadius, headLength, 16);
+      headGeo.translate(0, headLength / 2, 0);
+      const head = new THREE.Mesh(headGeo, mat);
+
+      group.add(shaft, head);
+      group.userData = { shaft, head, headLength };
+      group.setLength = function (len) {
+        const L = Math.max(headLength + 0.05, len);
+        const shaftLen = L - headLength;
+        shaft.scale.set(1, shaftLen, 1);
+        head.position.set(0, shaftLen, 0);
+      };
+      group.setDirection = function (dir) {
+        const d = dir.clone().normalize();
+        const up = new THREE.Vector3(0, 1, 0);
+        const q = new THREE.Quaternion().setFromUnitVectors(up, d);
+        group.quaternion.copy(q);
+      };
+      group.setLength(1);
+      return group;
+    }
+
+    // 地理坐标 (E, N, U) 转换为 Three.js 坐标 (X=E, Y=U, Z=-N)
+    function geoToThree(e, n, u) {
+      return new THREE.Vector3(e, u, -n);
+    }
+
+    // 根据走向(Strike, 北偏东)、倾角(Dip)、滑动角(Rake)计算地理单位向量 (E, N, U)
+    function faultVectorsGeo(strikeDeg, dipDeg, rakeDeg = 0) {
+      const a = strikeDeg * DEG2RAD;
+      const d = dipDeg * DEG2RAD;
+      const r = rakeDeg * DEG2RAD;
+      // 沿走向单位向量
+      const strikeVec = [Math.sin(a), Math.cos(a), 0];
+      // 沿下倾方向单位向量 (右手定则：走向右侧下倾)
+      const downDipVec = [Math.cos(a) * Math.cos(d), -Math.sin(a) * Math.cos(d), -Math.sin(d)];
+      // 上盘法向量 (指向上方)
+      const normalVec = [Math.cos(a) * Math.sin(d), -Math.sin(a) * Math.sin(d), Math.cos(d)];
+      // 上盘相对下盘滑动方向 (Aki & Richards 约定: 0左旋, 180右旋, +90逆断, -90正断)
+      const slipVec = [
+        Math.cos(r) * strikeVec[0] - Math.sin(r) * downDipVec[0],
+        Math.cos(r) * strikeVec[1] - Math.sin(r) * downDipVec[1],
+        Math.cos(r) * strikeVec[2] - Math.sin(r) * downDipVec[2]
+      ];
+      return { strikeVec, downDipVec, normalVec, slipVec };
+    }
+
+    // =========================================================================
+    // 模块 1：二维应力莫尔圆与断层切面 (Mohr2D)
+    // =========================================================================
+    const Mohr2D = {
+      state: { s1: 80, s3: 30, p: 0, c: 10, mu: 0.6, theta: 60 },
+      pulsePhase: 0,
+
+      init() {
+        const bind = (id, key, isFloat = false) => {
+          const el = document.getElementById(id);
+          el.addEventListener('input', () => {
+            this.state[key] = isFloat ? parseFloat(el.value) : parseInt(el.value, 10);
+            // 约束 σ3 < σ1
+            if (key === 's1' && this.state.s3 >= this.state.s1) {
+              this.state.s3 = Math.max(0, this.state.s1 - 2);
+              document.getElementById('m2d-s3').value = this.state.s3;
+            } else if (key === 's3' && this.state.s3 >= this.state.s1) {
+              this.state.s1 = Math.min(150, this.state.s3 + 2);
+              document.getElementById('m2d-s1').value = this.state.s1;
+            }
+            this.syncLabels();
+            this.render();
+          });
+        };
+        bind('m2d-s1', 's1');
+        bind('m2d-s3', 's3');
+        bind('m2d-p', 'p');
+        bind('m2d-c', 'c', true);
+        bind('m2d-mu', 'mu', true);
+        bind('m2d-theta', 'theta');
+
+        const ro = new ResizeObserver(() => {
+          if (App.activeTab === 'mohr2d') this.render();
+        });
+        ro.observe(document.getElementById('m2d-block-wrap'));
+        ro.observe(document.getElementById('m2d-mohr-wrap'));
+        this.syncLabels();
+        this.render();
+      },
+
+      applyPreset(type) {
+        if (type === 'safe') {
+          this.state = { s1: 80, s3: 30, p: 0, c: 10, mu: 0.6, theta: 60 };
+        } else if (type === 'critical') {
+          this.state = { s1: 118, s3: 26, p: 0, c: 8, mu: 0.6, theta: 60 };
+        } else if (type === 'injection') {
+          this.state = { s1: 92, s3: 34, p: 32, c: 8, mu: 0.6, theta: 60 };
+        }
+        document.getElementById('m2d-s1').value = this.state.s1;
+        document.getElementById('m2d-s3').value = this.state.s3;
+        document.getElementById('m2d-p').value = this.state.p;
+        document.getElementById('m2d-c').value = this.state.c;
+        document.getElementById('m2d-mu').value = this.state.mu;
+        document.getElementById('m2d-theta').value = this.state.theta;
+        this.syncLabels();
+        this.render();
+      },
+
+      syncLabels() {
+        const s = this.state;
+        document.getElementById('m2d-val-s1').textContent = `${s.s1} MPa`;
+        document.getElementById('m2d-val-s3').textContent = `${s.s3} MPa`;
+        document.getElementById('m2d-val-p').textContent = `${s.p} MPa`;
+        document.getElementById('m2d-val-c').textContent = `${s.c.toFixed(1)} MPa`;
+        document.getElementById('m2d-val-mu').textContent = `${s.mu.toFixed(2)}`;
+        document.getElementById('m2d-val-theta').textContent = `${s.theta}°`;
+        document.getElementById('m2d-val-2theta').textContent = `${s.theta * 2}°`;
+      },
+
+      compute() {
+        const { s1, s3, p, c, mu, theta } = this.state;
+        const s1Eff = s1 - p;
+        const s3Eff = s3 - p;
+        const center = (s1Eff + s3Eff) / 2;
+        const radius = (s1Eff - s3Eff) / 2;
+        const rad2t = 2 * theta * DEG2RAD;
+        const sn = center + radius * Math.cos(rad2t);
+        const tau = radius * Math.sin(rad2t);
+        const tf = c + mu * sn;
+        const cfs = tau - tf;
+        return { s1Eff, s3Eff, center, radius, sn, tau, tf, cfs, failed: cfs >= -0.05 };
+      },
+
+      render() {
+        const res = this.compute();
+        this.updateCards(res);
+        this.drawBlock(res);
+        this.drawMohr(res);
+      },
+
+      tick(dt) {
+        this.pulsePhase += dt * 4.5;
+        const res = this.compute();
+        if (res.failed) {
+          this.drawBlock(res);
+        }
+      },
+
+      updateCards(res) {
+        document.getElementById('m2d-out-sn').textContent = `${res.sn.toFixed(1)} MPa`;
+        document.getElementById('m2d-out-tau').textContent = `${res.tau.toFixed(1)} MPa`;
+        document.getElementById('m2d-out-tf').textContent = `${res.tf.toFixed(1)} MPa`;
+        const cfsEl = document.getElementById('m2d-out-cfs');
+        cfsEl.textContent = `${res.cfs >= 0 ? '+' : ''}${res.cfs.toFixed(1)} MPa`;
+        cfsEl.className = `text-lg font-mono font-bold mt-0.5 ${res.failed ? 'text-rose-400' : 'text-emerald-400'}`;
+
+        const stEl = document.getElementById('m2d-out-status');
+        if (res.failed) {
+          stEl.textContent = '触发破裂 (FAILURE)';
+          stEl.className = 'mt-1 inline-flex items-center justify-center px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/50 animate-pulse';
+        } else {
+          stEl.textContent = '安全稳定 (SAFE)';
+          stEl.className = 'mt-1 inline-flex items-center justify-center px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+        }
+      },
+
+      drawArrow2D(ctx, x1, y1, x2, y2, color, width = 2.5, head = 9) {
+        const dx = x2 - x1, dy = y2 - y1;
+        const len = Math.hypot(dx, dy);
+        if (len < 2) return;
+        const ang = Math.atan2(dy, dx);
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
+        ctx.lineWidth = width;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2 - Math.cos(ang) * (head * 0.6), y2 - Math.sin(ang) * (head * 0.6));
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x2 - head * Math.cos(ang - 0.42), y2 - head * Math.sin(ang - 0.42));
+        ctx.lineTo(x2 - head * Math.cos(ang + 0.42), y2 - head * Math.sin(ang + 0.42));
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      },
+
+      drawBlock(res) {
+        const canvas = document.getElementById('m2d-block-canvas');
+        const wrap = document.getElementById('m2d-block-wrap');
+        const { ctx, w, h } = setupCanvasDPR(canvas, wrap);
+        if (w < 40 || h < 40) return;
+        ctx.clearRect(0, 0, w, h);
+
+        const cx = w / 2, cy = h / 2;
+        const size = Math.min(w, h) * 0.44;
+        const half = size / 2;
+
+        // 岩石块体阴影与填充
+        ctx.save();
+        const grad = ctx.createLinearGradient(cx - half, cy - half, cx + half, cy + half);
+        grad.addColorStop(0, '#1e293b');
+        grad.addColorStop(1, '#0f172a');
+        ctx.fillStyle = grad;
+        ctx.strokeStyle = res.failed ? 'rgba(248, 113, 113, 0.8)' : '#475569';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(cx - half, cy - half, size, size, 6);
+        ctx.fill();
+        ctx.stroke();
+
+        // 岩石微纹理网格
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.08)';
+        ctx.lineWidth = 1;
+        const step = size / 6;
+        for (let i = 1; i < 6; i++) {
+          ctx.beginPath();
+          ctx.moveTo(cx - half + i * step, cy - half);
+          ctx.lineTo(cx - half + i * step, cy + half);
+          ctx.moveTo(cx - half, cy - half + i * step);
+          ctx.lineTo(cx + half, cy - half + i * step);
+          ctx.stroke();
+        }
+        ctx.restore();
+
+        // 外部主应力箭头：σ1 (上下，红色) 与 σ3 (左右，蓝色)
+        const s1Len = 24 + (this.state.s1 / 150) * 42;
+        const s3Len = 18 + (this.state.s3 / 150) * 42;
+
+        // 上下 σ1
+        for (const offset of [-half * 0.45, 0, half * 0.45]) {
+          this.drawArrow2D(ctx, cx + offset, cy - half - s1Len - 8, cx + offset, cy - half - 6, '#f87171', 2.4, 8);
+          this.drawArrow2D(ctx, cx + offset, cy + half + s1Len + 8, cx + offset, cy + half + 6, '#f87171', 2.4, 8);
+        }
+        ctx.fillStyle = '#fca5a5';
+        ctx.font = 'bold 12px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`σ₁ = ${this.state.s1} MPa`, cx, cy - half - s1Len - 16);
+
+        // 左右 σ3
+        for (const offset of [-half * 0.42, half * 0.42]) {
+          this.drawArrow2D(ctx, cx - half - s3Len - 8, cy + offset, cx - half - 6, cy + offset, '#38bdf8', 2.2, 7);
+          this.drawArrow2D(ctx, cx + half + s3Len + 8, cy + offset, cx + half + 6, cy + offset, '#38bdf8', 2.2, 7);
+        }
+        ctx.fillStyle = '#7dd3fc';
+        ctx.textAlign = 'left';
+        ctx.fillText(`σ₃=${this.state.s3}`, cx + half + 10, cy + 4);
+
+        // 断层面绘制：法线与 σ1 (向上 -Y) 夹角为 θ
+        // 法线单位向量 n = (sin θ, -cos θ)，断层面切线方向 t = (cos θ, sin θ)
+        const th = this.state.theta * DEG2RAD;
+        const nx = Math.sin(th), ny = -Math.cos(th);
+        const tx = Math.cos(th), ty = Math.sin(th);
+
+        // 将断层线裁剪到正方形块体内部 [-half, half]^2
+        let tMax = Infinity;
+        if (Math.abs(tx) > 1e-5) tMax = Math.min(tMax, half / Math.abs(tx));
+        if (Math.abs(ty) > 1e-5) tMax = Math.min(tMax, half / Math.abs(ty));
+
+        const xA = cx - tx * tMax, yA = cy - ty * tMax;
+        const xB = cx + tx * tMax, yB = cy + ty * tMax;
+
+        // 破裂闪烁发光效果
+        ctx.save();
+        if (res.failed) {
+          const glow = 0.55 + 0.45 * Math.sin(this.pulsePhase);
+          ctx.shadowColor = '#ef4444';
+          ctx.shadowBlur = 16 * glow;
+          ctx.strokeStyle = `rgba(248, 113, 113, ${0.75 + 0.25 * glow})`;
+          ctx.lineWidth = 4.5;
+        } else {
+          ctx.strokeStyle = '#fbbf24';
+          ctx.lineWidth = 3;
+        }
+        ctx.beginPath();
+        ctx.moveTo(xA, yA);
+        ctx.lineTo(xB, yB);
+        ctx.stroke();
+        ctx.restore();
+
+        // 若破裂，画断层两侧的错动趋势双箭头
+        if (res.failed) {
+          const shift = 11;
+          const lenSlip = Math.min(34, tMax * 0.5);
+          this.drawArrow2D(ctx, cx + nx * shift - tx * lenSlip * 0.5, cy + ny * shift - ty * lenSlip * 0.5,
+                                cx + nx * shift + tx * lenSlip * 0.5, cy + ny * shift + ty * lenSlip * 0.5, '#fca5a5', 2, 7);
+          this.drawArrow2D(ctx, cx - nx * shift + tx * lenSlip * 0.5, cy - ny * shift + ty * lenSlip * 0.5,
+                                cx - nx * shift - tx * lenSlip * 0.5, cy - ny * shift - ty * lenSlip * 0.5, '#fca5a5', 2, 7);
+        }
+
+        // 绘制法线虚线与 θ 夹角弧
+        ctx.save();
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.5)';
+        ctx.setLineDash([4, 3]);
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx, cy - half * 0.72);
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + nx * half * 0.72, cy + ny * half * 0.72);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        if (this.state.theta > 4) {
+          ctx.strokeStyle = '#cbd5e1';
+          ctx.lineWidth = 1.4;
+          ctx.beginPath();
+          ctx.arc(cx, cy, 24, -Math.PI / 2, -Math.PI / 2 + th, false);
+          ctx.stroke();
+          ctx.fillStyle = '#e2e8f0';
+          ctx.font = '11px Inter, sans-serif';
+          ctx.textAlign = 'center';
+          const midA = -Math.PI / 2 + th / 2;
+          ctx.fillText('θ', cx + Math.cos(midA) * 35, cy + Math.sin(midA) * 35 + 4);
+        }
+        ctx.restore();
+
+        // 有效正应力 σn' 箭头 (指向断层面挤压方向 -n，或若拉张则向外)
+        const snLen = Math.min(58, Math.max(14, Math.abs(res.sn) * 0.55));
+        if (res.sn >= 0) {
+          this.drawArrow2D(ctx, cx + nx * (snLen + 6), cy + ny * (snLen + 6), cx + nx * 5, cy + ny * 5, '#38bdf8', 2.8, 8);
+        } else {
+          this.drawArrow2D(ctx, cx + nx * 5, cy + ny * 5, cx + nx * (snLen + 6), cy + ny * (snLen + 6), '#22d3ee', 2.8, 8);
+        }
+        ctx.fillStyle = '#38bdf8';
+        ctx.font = 'bold 11px Inter, sans-serif';
+        ctx.fillText("σn'", cx + nx * (snLen + 16), cy + ny * (snLen + 16));
+
+        // 剪应力 τ 箭头 (沿断层面切线方向)
+        if (res.tau > 0.5) {
+          const tauLen = Math.min(62, Math.max(14, res.tau * 1.1));
+          const off = 8;
+          this.drawArrow2D(ctx, cx + nx * off, cy + ny * off, cx + nx * off + tx * tauLen, cy + ny * off + ty * tauLen, '#fbbf24', 2.8, 8);
+          ctx.fillStyle = '#fbbf24';
+          ctx.fillText('τ', cx + nx * (off + 10) + tx * (tauLen * 0.7), cy + ny * (off + 10) + ty * (tauLen * 0.7));
+        }
+      },
+
+      drawMohr(res) {
+        const canvas = document.getElementById('m2d-mohr-canvas');
+        const wrap = document.getElementById('m2d-mohr-wrap');
+        const { ctx, w, h } = setupCanvasDPR(canvas, wrap);
+        ctx.clearRect(0, 0, w, h);
+
+        const pad = { l: 48, r: 22, t: 24, b: 38 };
+        const plotW = w - pad.l - pad.r;
+        const plotH = h - pad.t - pad.b;
+        if (plotW <= 10 || plotH <= 10) return;
+        // 动态协调比例尺，保证圆是正圆！
+        const minSig = Math.min(-15, res.s3Eff - 15);
+        const maxSig = Math.max(155, this.state.s1 + 15);
+        const spanSig = maxSig - minSig;
+        const scale = Math.min(plotW / spanSig, plotH / 88);
+
+        const originX = pad.l + (-minSig) * scale;
+        const originY = h - pad.b;
+
+        const toX = (sig) => originX + sig * scale;
+        const toY = (tau) => originY - tau * scale;
+
+        // 网格线
+        ctx.strokeStyle = 'rgba(51, 65, 85, 0.45)';
+        ctx.lineWidth = 1;
+        ctx.font = '10px JetBrains Mono, monospace';
+        ctx.fillStyle = '#64748b';
+
+        for (let s = Math.ceil(minSig / 20) * 20; s <= maxSig; s += 20) {
+          const x = toX(s);
+          if (x < pad.l || x > w - pad.r) continue;
+          ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, originY); ctx.stroke();
+          ctx.textAlign = 'center';
+          ctx.fillText(s, x, originY + 15);
+        }
+        const maxTau = Math.floor(plotH / scale);
+        for (let t = 0; t <= maxTau; t += 20) {
+          const y = toY(t);
+          if (y < pad.t) continue;
+          ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w - pad.r, y); ctx.stroke();
+          ctx.textAlign = 'right';
+          ctx.fillText(t, pad.l - 6, y + 3);
+        }
+
+        // 裁剪绘图区
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(pad.l, pad.t, plotW, plotH);
+        ctx.clip();
+
+        // 1. 红色库仑破裂包络线与上方半透明破裂区
+        const xLeft = minSig, xRight = maxSig;
+        const yLeft = this.state.c + this.state.mu * xLeft;
+        const yRight = this.state.c + this.state.mu * xRight;
+
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.13)';
+        ctx.beginPath();
+        ctx.moveTo(toX(xLeft), toY(yLeft));
+        ctx.lineTo(toX(xRight), toY(yRight));
+        ctx.lineTo(toX(xRight), pad.t);
+        ctx.lineTo(toX(xLeft), pad.t);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        ctx.moveTo(toX(xLeft), toY(yLeft));
+        ctx.lineTo(toX(xRight), toY(yRight));
+        ctx.stroke();
+
+        // 标注破裂区
+        ctx.fillStyle = 'rgba(248, 113, 113, 0.85)';
+        ctx.font = 'bold 11px Inter, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(`破裂区  τf = ${this.state.c.toFixed(1)} + ${this.state.mu.toFixed(2)}·σ'`, pad.l + 10, pad.t + 18);
+
+        // 2. 若孔隙水压 P > 0，绘制灰色虚线总应力莫尔圆及左移箭头
+        if (this.state.p > 0) {
+          const totCenter = (this.state.s1 + this.state.s3) / 2;
+          const totR = (this.state.s1 - this.state.s3) / 2;
+          ctx.save();
+          ctx.strokeStyle = 'rgba(148, 163, 184, 0.45)';
+          ctx.setLineDash([5, 4]);
+          ctx.lineWidth = 1.6;
+          ctx.beginPath();
+          ctx.arc(toX(totCenter), originY, totR * scale, Math.PI, 0, false);
+          ctx.stroke();
+          ctx.restore();
+
+          // 水压左移箭头
+          const arrowY = originY - totR * scale - 10;
+          if (arrowY > pad.t + 18) {
+            this.drawArrow2D(ctx, toX(totCenter), arrowY, toX(res.center), arrowY, '#22d3ee', 2, 7);
+            ctx.fillStyle = '#22d3ee';
+            ctx.font = 'bold 10px JetBrains Mono, monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(`-P (${this.state.p} MPa)`, (toX(totCenter) + toX(res.center)) / 2, arrowY - 6);
+          }
+        }
+
+        // 3. 当前有效应力莫尔圆
+        ctx.fillStyle = res.failed ? 'rgba(248, 113, 113, 0.12)' : 'rgba(56, 189, 248, 0.12)';
+        ctx.strokeStyle = res.failed ? '#f97316' : '#38bdf8';
+        ctx.lineWidth = 2.6;
+        ctx.beginPath();
+        ctx.arc(toX(res.center), originY, Math.max(1, res.radius * scale), Math.PI, 0, false);
+        ctx.fill();
+        ctx.stroke();
+
+        // 圆心与 2θ 半径线 + 角度弧
+        const px = toX(res.sn), py = toY(res.tau);
+        const ox = toX(res.center);
+
+        ctx.strokeStyle = 'rgba(251, 191, 36, 0.85)';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(ox, originY);
+        ctx.lineTo(px, py);
+        ctx.stroke();
+
+        // 2θ 弧线 (从正横轴逆时针到 2θ)
+        const arcR = Math.min(24, res.radius * scale * 0.45);
+        if (arcR > 6 && this.state.theta > 2) {
+          ctx.strokeStyle = '#fbbf24';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(ox, originY, arcR, 0, -2 * this.state.theta * DEG2RAD, true);
+          ctx.stroke();
+          ctx.fillStyle = '#fde68a';
+          ctx.font = '10px JetBrains Mono, monospace';
+          const ma = -this.state.theta * DEG2RAD;
+          ctx.fillText('2θ', ox + Math.cos(ma) * (arcR + 12), originY + Math.sin(ma) * (arcR + 10));
+        }
+
+        // 4. 点到库仑破裂线的垂直距离虚线 (CFS 裕度)
+        const tfY = toY(res.tf);
+        ctx.save();
+        ctx.setLineDash([4, 3]);
+        ctx.strokeStyle = res.failed ? '#ef4444' : '#34d399';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(px, py);
+        ctx.lineTo(px, tfY);
+        ctx.stroke();
+        ctx.restore();
+
+        // 标注 CFS 数值
+        ctx.fillStyle = res.failed ? '#fca5a5' : '#6ee7b7';
+        ctx.font = 'bold 10px JetBrains Mono, monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(`CFS=${res.cfs >= 0 ? '+' : ''}${res.cfs.toFixed(1)}`, px + 8, (py + tfY) / 2 + 3);
+
+        // 高亮断层应力点
+        ctx.fillStyle = '#f43f5e';
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(px, py, 5.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // 标注 σ3' 与 σ1'
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = 'bold 10px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText("σ₃'", toX(res.s3Eff), originY - 6);
+        ctx.fillText("σ₁'", toX(res.s1Eff), originY - 6);
+
+        ctx.restore(); // 结束裁剪
+
+        // 坐标轴主线
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(pad.l, originY); ctx.lineTo(w - pad.r, originY);
+        ctx.moveTo(toX(0) >= pad.l ? toX(0) : pad.l, pad.t);
+        ctx.lineTo(toX(0) >= pad.l ? toX(0) : pad.l, originY);
+        ctx.stroke();
+
+        // 轴标题
+        ctx.fillStyle = '#cbd5e1';
+        ctx.font = '11px Inter, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText("有效正应力 σ' (MPa)", w - pad.r, h - 8);
+        ctx.save();
+        ctx.translate(14, pad.t + plotH / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.textAlign = 'center';
+        ctx.fillText('剪应力 τ (MPa)', 0, 0);
+        ctx.restore();
+      }
+    };
+
+    // =========================================================================
+    // 模块 2：三维应力莫尔圆与三维块体受力 (Mohr3D)
+    // =========================================================================
+    const Mohr3D = {
+      state: { s1: 100, s2: 65, s3: 30, p: 10, c: 8, mu: 0.6, strike: 25, dip: 60, regime: 'normal' },
+      trail: [],
+      scene: null, camera: null, renderer: null, controls: null,
+      stressArrows: null, faultMesh: null, faultOutline: null, normalArrow: null, shearArrow: null,
+      inited: false,
+
+      // 不同构造体制下，主应力轴 e1, e2, e3 在地理坐标系 (E, N, U) 中的方向
+      getPrincipalAxes() {
+        if (this.state.regime === 'normal') {
+          // σ1 垂直(U), σ2 北(N), σ3 东(E)
+          return { e1: [0, 0, 1], e2: [0, 1, 0], e3: [1, 0, 0] };
+        } else if (this.state.regime === 'reverse') {
+          // σ1 东(E), σ2 北(N), σ3 垂直(U)
+          return { e1: [1, 0, 0], e2: [0, 1, 0], e3: [0, 0, 1] };
+        } else {
+          // 走滑: σ1 东(E), σ2 垂直(U), σ3 北(N)
+          return { e1: [1, 0, 0], e2: [0, 0, 1], e3: [0, 1, 0] };
+        }
+      },
+
+      init() {
+        const bind = (id, key, isFloat = false) => {
+          const el = document.getElementById(id);
+          el.addEventListener('input', () => {
+            this.state[key] = isFloat ? parseFloat(el.value) : parseInt(el.value, 10);
+            // 维持 σ1 >= σ2 >= σ3
+            if (key === 's1') {
+              if (this.state.s2 > this.state.s1) { this.state.s2 = this.state.s1; document.getElementById('m3d-s2').value = this.state.s2; }
+              if (this.state.s3 > this.state.s2) { this.state.s3 = this.state.s2; document.getElementById('m3d-s3').value = this.state.s3; }
+            } else if (key === 's2') {
+              if (this.state.s2 > this.state.s1) { this.state.s1 = this.state.s2; document.getElementById('m3d-s1').value = this.state.s1; }
+              if (this.state.s2 < this.state.s3) { this.state.s3 = this.state.s2; document.getElementById('m3d-s3').value = this.state.s3; }
+            } else if (key === 's3') {
+              if (this.state.s3 > this.state.s2) { this.state.s2 = this.state.s3; document.getElementById('m3d-s2').value = this.state.s2; }
+              if (this.state.s2 > this.state.s1) { this.state.s1 = this.state.s2; document.getElementById('m3d-s1').value = this.state.s1; }
+            }
+            this.syncLabels();
+            this.updateAll(key === 'strike' || key === 'dip');
+          });
+        };
+        bind('m3d-s1', 's1');
+        bind('m3d-s2', 's2');
+        bind('m3d-s3', 's3');
+        bind('m3d-p', 'p');
+        bind('m3d-c', 'c', true);
+        bind('m3d-mu', 'mu', true);
+        bind('m3d-strike', 'strike');
+        bind('m3d-dip', 'dip');
+
+        this.initThree();
+
+        const ro = new ResizeObserver(() => {
+          if (App.activeTab === 'mohr3d') {
+            this.resizeThree();
+            this.drawMohr3D(this.compute());
+          }
+        });
+        ro.observe(document.getElementById('m3d-three-wrap'));
+        ro.observe(document.getElementById('m3d-mohr-wrap'));
+
+        this.syncLabels();
+        this.updateAll(false);
+        this.inited = true;
+      },
+
+      applyPreset(regime) {
+        this.state.regime = regime;
+        this.trail = [];
+        const badge = document.getElementById('m3d-regime-badge');
+        if (regime === 'normal') {
+          this.state.s1 = 105; this.state.s2 = 65; this.state.s3 = 30; this.state.p = 10;
+          this.state.strike = 15; this.state.dip = 62;
+          badge.textContent = 'σ₁ 垂直 (正断层)';
+        } else if (regime === 'reverse') {
+          this.state.s1 = 120; this.state.s2 = 75; this.state.s3 = 32; this.state.p = 10;
+          this.state.strike = 10; this.state.dip = 30;
+          badge.textContent = 'σ₃ 垂直 (逆断层)';
+        } else {
+          this.state.s1 = 110; this.state.s2 = 70; this.state.s3 = 28; this.state.p = 12;
+          this.state.strike = 60; this.state.dip = 85;
+          badge.textContent = 'σ₂ 垂直 (走滑)';
+        }
+        document.getElementById('m3d-s1').value = this.state.s1;
+        document.getElementById('m3d-s2').value = this.state.s2;
+        document.getElementById('m3d-s3').value = this.state.s3;
+        document.getElementById('m3d-p').value = this.state.p;
+        document.getElementById('m3d-strike').value = this.state.strike;
+        document.getElementById('m3d-dip').value = this.state.dip;
+        this.syncLabels();
+        this.updateAll(false);
+      },
+
+      clearTrail() {
+        this.trail = [];
+        this.drawMohr3D(this.compute());
+      },
+
+      syncLabels() {
+        const s = this.state;
+        document.getElementById('m3d-val-s1').textContent = `${s.s1} MPa`;
+        document.getElementById('m3d-val-s2').textContent = `${s.s2} MPa`;
+        document.getElementById('m3d-val-s3').textContent = `${s.s3} MPa`;
+        document.getElementById('m3d-val-p').textContent = `${s.p} MPa`;
+        document.getElementById('m3d-val-c').textContent = `${s.c.toFixed(1)}`;
+        document.getElementById('m3d-val-mu').textContent = `${s.mu.toFixed(2)}`;
+        document.getElementById('m3d-val-strike').textContent = `${s.strike}°`;
+        document.getElementById('m3d-val-dip').textContent = `${s.dip}°`;
+      },
+
+      compute() {
+        const { s1, s2, s3, p, c, mu, strike, dip } = this.state;
+        const s1e = s1 - p, s2e = s2 - p, s3e = s3 - p;
+        const { normalVec } = faultVectorsGeo(strike, dip, 0);
+        const axes = this.getPrincipalAxes();
+        const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+        const n1 = dot(normalVec, axes.e1);
+        const n2 = dot(normalVec, axes.e2);
+        const n3 = dot(normalVec, axes.e3);
+
+        const sn = s1e * n1 * n1 + s2e * n2 * n2 + s3e * n3 * n3;
+        const tSq = (s1e * n1) ** 2 + (s2e * n2) ** 2 + (s3e * n3) ** 2;
+        const tau = Math.sqrt(Math.max(0, tSq - sn * sn));
+        const tf = c + mu * sn;
+        const cfs = tau - tf;
+
+        // 计算世界坐标 (地理 E, N, U) 中的剪应力矢量 τ = T - σn * n
+        const T_p = [s1e * n1, s2e * n2, s3e * n3];
+        const tau_p = [T_p[0] - sn * n1, T_p[1] - sn * n2, T_p[2] - sn * n3];
+        const tauGeo = [
+          tau_p[0] * axes.e1[0] + tau_p[1] * axes.e2[0] + tau_p[2] * axes.e3[0],
+          tau_p[0] * axes.e1[1] + tau_p[1] * axes.e2[1] + tau_p[2] * axes.e3[1],
+          tau_p[0] * axes.e1[2] + tau_p[1] * axes.e2[2] + tau_p[2] * axes.e3[2]
+        ];
+
+        return { s1e, s2e, s3e, n1, n2, n3, normalVec, tauGeo, sn, tau, tf, cfs, failed: cfs >= -0.05 };
+      },
+
+      initThree() {
+        const container = document.getElementById('m3d-three-wrap');
+        this.scene = new THREE.Scene();
+        this.scene.background = new THREE.Color(0x020617);
+
+        this.camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+        this.camera.position.set(4.1, 3.2, 4.4);
+
+        this.renderer = new THREE.WebGLRenderer({ antialias: true });
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        container.appendChild(this.renderer.domElement);
+
+        this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+        this.controls.enableDamping = true;
+        this.controls.dampingFactor = 0.08;
+        this.controls.minDistance = 2.8;
+        this.controls.maxDistance = 12;
+
+        // 灯光
+        this.scene.add(new THREE.AmbientLight(0xffffff, 0.65));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.85);
+        dirLight.position.set(5, 8, 6);
+        this.scene.add(dirLight);
+        const dirLight2 = new THREE.DirectionalLight(0x38bdf8, 0.35);
+        dirLight2.position.set(-5, -4, -5);
+        this.scene.add(dirLight2);
+
+        // 岩石立方体 (2x2x2)
+        const boxGeo = new THREE.BoxGeometry(2, 2, 2);
+        const boxMat = new THREE.MeshPhysicalMaterial({
+          color: 0x334155,
+          transparent: true,
+          opacity: 0.22,
+          roughness: 0.3,
+          metalness: 0.1,
+          side: THREE.DoubleSide,
+          depthWrite: false
+        });
+        this.scene.add(new THREE.Mesh(boxGeo, boxMat));
+
+        const edges = new THREE.LineSegments(
+          new THREE.EdgesGeometry(boxGeo),
+          new THREE.LineBasicMaterial({ color: 0x64748b, transparent: true, opacity: 0.85 })
+        );
+        this.scene.add(edges);
+
+        // 坐标轴与 E/N/U 标注
+        const axisLen = 1.65;
+        const axesGroup = new THREE.Group();
+        axesGroup.add(new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 0), axisLen, 0x94a3b8, 0.12, 0.06));
+        axesGroup.add(new THREE.ArrowHelper(new THREE.Vector3(0, 0, -1), new THREE.Vector3(0, 0, 0), axisLen, 0x94a3b8, 0.12, 0.06));
+        axesGroup.add(new THREE.ArrowHelper(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 0), axisLen, 0x94a3b8, 0.12, 0.06));
+        const spE = createTextSprite('东 X', '#cbd5e1'); spE.position.set(1.85, 0, 0); spE.scale.set(0.45, 0.18, 1);
+        const spN = createTextSprite('北 Y', '#cbd5e1'); spN.position.set(0, 0, -1.85); spN.scale.set(0.45, 0.18, 1);
+        const spU = createTextSprite('上 Z', '#cbd5e1'); spU.position.set(0, 1.85, 0); spU.scale.set(0.45, 0.18, 1);
+        axesGroup.add(spE, spN, spU);
+        this.scene.add(axesGroup);
+
+        // 6 个面的主应力箭头容器
+        this.stressArrows = new THREE.Group();
+        this.scene.add(this.stressArrows);
+
+        // 内部断层多边形
+        this.faultMesh = new THREE.Mesh(
+          new THREE.BufferGeometry(),
+          new THREE.MeshPhysicalMaterial({
+            color: 0x38bdf8,
+            emissive: 0x0284c7,
+            emissiveIntensity: 0.35,
+            transparent: true,
+            opacity: 0.62,
+            side: THREE.DoubleSide
+          })
+        );
+        this.scene.add(this.faultMesh);
+
+        this.faultOutline = new THREE.LineLoop(
+          new THREE.BufferGeometry(),
+          new THREE.LineBasicMaterial({ color: 0xe0f2fe, linewidth: 2 })
+        );
+        this.scene.add(this.faultOutline);
+
+        // 断层中心法向与剪应力箭头
+        this.normalArrow = createThickArrow(0x22d3ee, 0.032, 0.085, 0.22);
+        this.shearArrow = createThickArrow(0xfbbf24, 0.035, 0.09, 0.22);
+        this.scene.add(this.normalArrow, this.shearArrow);
+
+        this.resizeThree();
+      },
+
+      resetCamera() {
+        if (!this.camera) return;
+        this.camera.position.set(4.1, 3.2, 4.4);
+        this.controls.target.set(0, 0, 0);
+        this.controls.update();
+      },
+
+      resizeThree() {
+        if (!this.renderer) return;
+        const container = document.getElementById('m3d-three-wrap');
+        if (container.clientWidth === 0 || container.clientHeight === 0) return;
+        const w = Math.max(10, container.clientWidth);
+        const h = Math.max(10, container.clientHeight);
+        this.camera.aspect = w / h;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(w, h);
+      },
+
+      // 计算过原点、法向量为 nThree 的平面与立方体 [-1, 1]^3 的精确交点多边形
+      computePlaneCubePolygon(nThree) {
+        const edges = [
+          [[-1,-1,-1],[1,-1,-1]], [[-1,1,-1],[1,1,-1]], [[-1,-1,1],[1,-1,1]], [[-1,1,1],[1,1,1]],
+          [[-1,-1,-1],[-1,1,-1]], [[1,-1,-1],[1,1,-1]], [[-1,-1,1],[-1,1,1]], [[1,-1,1],[1,1,1]],
+          [[-1,-1,-1],[-1,-1,1]], [[1,-1,-1],[1,-1,1]], [[-1,1,-1],[-1,1,1]], [[1,1,-1],[1,1,1]]
+        ];
+        const pts = [];
+        for (const [a, b] of edges) {
+          const va = new THREE.Vector3(...a);
+          const vb = new THREE.Vector3(...b);
+          const da = va.dot(nThree);
+          const db = vb.dot(nThree);
+          if (Math.abs(da) < 1e-6 && Math.abs(db) < 1e-6) continue;
+          if (da * db <= 0) {
+            const t = da / (da - db);
+            const p = va.clone().lerp(vb, t);
+            // 去重
+            if (!pts.some(q => q.distanceToSquared(p) < 1e-5)) pts.push(p);
+          }
+        }
+        if (pts.length < 3) return [];
+        // 在平面内建立局部二维坐标系按极角排序
+        const u = pts[0].clone().normalize();
+        const v = new THREE.Vector3().crossVectors(nThree, u).normalize();
+        pts.sort((p1, p2) => Math.atan2(p1.dot(v), p1.dot(u)) - Math.atan2(p2.dot(v), p2.dot(u)));
+        return pts;
+      },
+
+      updateThree(res) {
+        // 1. 重建 6 个面的主应力箭头
+        while (this.stressArrows.children.length > 0) {
+          this.stressArrows.remove(this.stressArrows.children[0]);
+        }
+        const axes = this.getPrincipalAxes();
+        const defs = [
+          { axis: axes.e1, val: this.state.s1, color: 0xf43f5e, hex: '#fb7185', label: `σ₁ ${this.state.s1}` },
+          { axis: axes.e2, val: this.state.s2, color: 0x10b981, hex: '#34d399', label: `σ₂ ${this.state.s2}` },
+          { axis: axes.e3, val: this.state.s3, color: 0x38bdf8, hex: '#38bdf8', label: `σ₃ ${this.state.s3}` }
+        ];
+        for (const d of defs) {
+          const dirThree = geoToThree(d.axis[0], d.axis[1], d.axis[2]).normalize();
+          const len = 0.45 + (d.val / 150) * 0.85;
+          for (const sign of [1, -1]) {
+            const arr = createThickArrow(d.color, 0.04, 0.11, 0.24);
+            arr.setLength(len);
+            // 从外部指向立方体表面 (受压)
+            const inward = dirThree.clone().multiplyScalar(-sign);
+            arr.setDirection(inward);
+            const startPos = dirThree.clone().multiplyScalar(sign * (1.06 + len));
+            arr.position.copy(startPos);
+            this.stressArrows.add(arr);
+          }
+          const sp = createTextSprite(d.label, d.hex);
+          sp.position.copy(dirThree.clone().multiplyScalar(1.32 + len));
+          this.stressArrows.add(sp);
+        }
+
+        // 2. 更新内部断层多边形
+        const nThree = geoToThree(res.normalVec[0], res.normalVec[1], res.normalVec[2]).normalize();
+        const poly = this.computePlaneCubePolygon(nThree);
+        if (poly.length >= 3) {
+          const verts = [];
+          for (let i = 1; i < poly.length - 1; i++) {
+            verts.push(poly[0].x, poly[0].y, poly[0].z);
+            verts.push(poly[i].x, poly[i].y, poly[i].z);
+            verts.push(poly[i + 1].x, poly[i + 1].y, poly[i + 1].z);
+          }
+          this.faultMesh.geometry.dispose();
+          const fGeo = new THREE.BufferGeometry();
+          fGeo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+          fGeo.computeVertexNormals();
+          this.faultMesh.geometry = fGeo;
+
+          this.faultOutline.geometry.dispose();
+          this.faultOutline.geometry = new THREE.BufferGeometry().setFromPoints(poly);
+
+          if (res.failed) {
+            this.faultMesh.material.color.setHex(0xef4444);
+            this.faultMesh.material.emissive.setHex(0xdc2626);
+            this.faultOutline.material.color.setHex(0xfca5a5);
+          } else {
+            this.faultMesh.material.color.setHex(0x38bdf8);
+            this.faultMesh.material.emissive.setHex(0x0284c7);
+            this.faultOutline.material.color.setHex(0xbae6fd);
+          }
+        }
+
+        // 3. 更新法向与剪应力箭头
+        this.normalArrow.position.set(0, 0, 0);
+        this.normalArrow.setDirection(nThree);
+        this.normalArrow.setLength(0.55 + Math.min(0.65, Math.abs(res.sn) / 140));
+
+        const tauThree = geoToThree(res.tauGeo[0], res.tauGeo[1], res.tauGeo[2]);
+        if (res.tau > 0.5 && tauThree.length() > 1e-4) {
+          this.shearArrow.visible = true;
+          this.shearArrow.position.set(0, 0, 0);
+          this.shearArrow.setDirection(tauThree);
+          this.shearArrow.setLength(0.45 + Math.min(0.8, res.tau / 60));
+        } else {
+          this.shearArrow.visible = false;
+        }
+      },
+
+      drawMohr3D(res) {
+        const canvas = document.getElementById('m3d-mohr-canvas');
+        const wrap = document.getElementById('m3d-mohr-wrap');
+        const { ctx, w, h } = setupCanvasDPR(canvas, wrap);
+        ctx.clearRect(0, 0, w, h);
+
+        const pad = { l: 48, r: 22, t: 24, b: 38 };
+        const plotW = w - pad.l - pad.r;
+        const plotH = h - pad.t - pad.b;
+        if (plotW <= 10 || plotH <= 10) return;
+        const minSig = Math.min(-15, res.s3e - 15);
+        const maxSig = Math.max(155, this.state.s1 + 15);
+        const scale = Math.min(plotW / (maxSig - minSig), plotH / 88);
+        const originX = pad.l + (-minSig) * scale;
+        const originY = h - pad.b;
+        const toX = (s) => originX + s * scale;
+        const toY = (t) => originY - t * scale;
+
+        // 网格
+        ctx.strokeStyle = 'rgba(51, 65, 85, 0.45)';
+        ctx.lineWidth = 1;
+        ctx.font = '10px JetBrains Mono, monospace';
+        ctx.fillStyle = '#64748b';
+        for (let s = Math.ceil(minSig / 20) * 20; s <= maxSig; s += 20) {
+          const x = toX(s);
+          if (x < pad.l || x > w - pad.r) continue;
+          ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, originY); ctx.stroke();
+          ctx.textAlign = 'center'; ctx.fillText(s, x, originY + 15);
+        }
+        const maxT = Math.floor(plotH / scale);
+        for (let t = 0; t <= maxT; t += 20) {
+          const y = toY(t);
+          if (y < pad.t) continue;
+          ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w - pad.r, y); ctx.stroke();
+          ctx.textAlign = 'right'; ctx.fillText(t, pad.l - 6, y + 3);
+        }
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(pad.l, pad.t, plotW, plotH);
+        ctx.clip();
+
+        // 破裂包络线与破裂区
+        const yL = this.state.c + this.state.mu * minSig;
+        const yR = this.state.c + this.state.mu * maxSig;
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.13)';
+        ctx.beginPath();
+        ctx.moveTo(toX(minSig), toY(yL));
+        ctx.lineTo(toX(maxSig), toY(yR));
+        ctx.lineTo(toX(maxSig), pad.t);
+        ctx.lineTo(toX(minSig), pad.t);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        ctx.moveTo(toX(minSig), toY(yL));
+        ctx.lineTo(toX(maxSig), toY(yR));
+        ctx.stroke();
+
+        // 三个莫尔圆参数
+        const c13 = (res.s1e + res.s3e) / 2, r13 = Math.max(0.5, (res.s1e - res.s3e) / 2);
+        const c12 = (res.s1e + res.s2e) / 2, r12 = Math.max(0.5, (res.s1e - res.s2e) / 2);
+        const c23 = (res.s2e + res.s3e) / 2, r23 = Math.max(0.5, (res.s2e - res.s3e) / 2);
+
+        // 月牙形合法三维应力域填充 (大圆顺时针 + 两个小圆逆时针)
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.22)';
+        ctx.beginPath();
+        ctx.arc(toX(c13), originY, r13 * scale, Math.PI, 0, false);
+        ctx.arc(toX(c12), originY, r12 * scale, 0, Math.PI, true);
+        ctx.arc(toX(c23), originY, r23 * scale, 0, Math.PI, true);
+        ctx.closePath();
+        ctx.fill();
+
+        // 三个圆轮廓
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 2.4;
+        ctx.beginPath(); ctx.arc(toX(c13), originY, r13 * scale, Math.PI, 0, false); ctx.stroke();
+
+        ctx.strokeStyle = '#34d399';
+        ctx.lineWidth = 1.8;
+        ctx.beginPath(); ctx.arc(toX(c12), originY, r12 * scale, Math.PI, 0, false); ctx.stroke();
+
+        ctx.strokeStyle = '#818cf8';
+        ctx.lineWidth = 1.8;
+        ctx.beginPath(); ctx.arc(toX(c23), originY, r23 * scale, Math.PI, 0, false); ctx.stroke();
+
+        // 轨迹线
+        if (this.trail.length > 1) {
+          ctx.strokeStyle = 'rgba(251, 191, 36, 0.55)';
+          ctx.lineWidth = 1.6;
+          ctx.beginPath();
+          this.trail.forEach((pt, idx) => {
+            const tx = toX(pt.sn), ty = toY(pt.tau);
+            if (idx === 0) ctx.moveTo(tx, ty); else ctx.lineTo(tx, ty);
+          });
+          ctx.stroke();
+        }
+
+        // 当前断层切面应力点 & CFS 虚线
+        const px = toX(res.sn), py = toY(res.tau), tfY = toY(res.tf);
+        ctx.save();
+        ctx.setLineDash([4, 3]);
+        ctx.strokeStyle = res.failed ? '#ef4444' : '#34d399';
+        ctx.lineWidth = 1.8;
+        ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px, tfY); ctx.stroke();
+        ctx.restore();
+
+        ctx.fillStyle = '#f43f5e';
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(px, py, 5.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // 主应力标签
+        ctx.fillStyle = '#cbd5e1';
+        ctx.font = 'bold 10px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText("σ₃'", toX(res.s3e), originY - 6);
+        ctx.fillText("σ₂'", toX(res.s2e), originY - 6);
+        ctx.fillText("σ₁'", toX(res.s1e), originY - 6);
+
+        ctx.restore();
+
+        // 坐标轴
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(pad.l, originY); ctx.lineTo(w - pad.r, originY);
+        ctx.moveTo(toX(0) >= pad.l ? toX(0) : pad.l, pad.t);
+        ctx.lineTo(toX(0) >= pad.l ? toX(0) : pad.l, originY);
+        ctx.stroke();
+
+        ctx.fillStyle = '#cbd5e1';
+        ctx.font = '11px Inter, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText("有效正应力 σ' (MPa)", w - pad.r, h - 8);
+      },
+
+      updateAll(recordTrail = false) {
+        const res = this.compute();
+        if (recordTrail) {
+          this.trail.push({ sn: res.sn, tau: res.tau });
+          if (this.trail.length > 80) this.trail.shift();
+        }
+        document.getElementById('m3d-out-n').textContent = `(${res.n1.toFixed(2)}, ${res.n2.toFixed(2)}, ${res.n3.toFixed(2)})`;
+        document.getElementById('m3d-out-sn').textContent = `${res.sn.toFixed(1)} MPa`;
+        document.getElementById('m3d-out-tau').textContent = `${res.tau.toFixed(1)} MPa`;
+        const cfsEl = document.getElementById('m3d-out-cfs');
+        cfsEl.textContent = `${res.cfs >= 0 ? '+' : ''}${res.cfs.toFixed(1)} MPa`;
+        cfsEl.className = `text-lg font-mono font-bold mt-0.5 ${res.failed ? 'text-rose-400' : 'text-emerald-400'}`;
+
+        const stEl = document.getElementById('m3d-out-status');
+        if (res.failed) {
+          stEl.textContent = '触发破裂 (FAILURE)';
+          stEl.className = 'mt-1 inline-flex items-center justify-center px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/50 animate-pulse';
+        } else {
+          stEl.textContent = '安全稳定 (SAFE)';
+          stEl.className = 'mt-1 inline-flex items-center justify-center px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+        }
+
+        this.updateThree(res);
+        this.drawMohr3D(res);
+      },
+
+      renderLoop() {
+        if (!this.renderer) return;
+        this.controls.update();
+        this.renderer.render(this.scene, this.camera);
+      }
+    };
+
+    // =========================================================================
+    // 模块 3：三维空间库仑应力触发 ΔCFS (Coulomb3D)
+    // =========================================================================
+    const Coulomb3D = {
+      state: {
+        sStrike: 90, sDip: 90, sRake: 180, sSlip: 3.0, sLen: 20,
+        rX: 18, rY: 2, rZ: 8, rStrike: 90, rDip: 90, rRake: 180,
+        mu: 0.4, sliceZ: 8, showSlice: true
+      },
+      scene: null, camera: null, renderer: null, controls: null,
+      sourceGroup: null, receiverGroup: null, sliceMesh: null,
+      subfaults: [],
+      dirty: false,
+
+      init() {
+        const bind = (id, key, isFloat = false, isCheck = false) => {
+          const el = document.getElementById(id);
+          el.addEventListener(isCheck ? 'change' : 'input', () => {
+            this.state[key] = isCheck ? el.checked : (isFloat ? parseFloat(el.value) : parseInt(el.value, 10));
+            this.syncLabels();
+            this.dirty = true;
+          });
+        };
+        bind('c3d-sStrike', 'sStrike');
+        bind('c3d-sDip', 'sDip');
+        bind('c3d-sRake', 'sRake');
+        bind('c3d-sSlip', 'sSlip', true);
+        bind('c3d-sLen', 'sLen');
+        bind('c3d-rX', 'rX');
+        bind('c3d-rY', 'rY');
+        bind('c3d-rZ', 'rZ');
+        bind('c3d-rStrike', 'rStrike');
+        bind('c3d-rDip', 'rDip');
+        bind('c3d-rRake', 'rRake');
+        bind('c3d-mu', 'mu', true);
+        bind('c3d-sliceZ', 'sliceZ');
+        bind('c3d-showSlice', 'showSlice', false, true);
+
+        this.initThree();
+
+        const ro = new ResizeObserver(() => {
+          if (App.activeTab === 'coulomb3d') {
+            this.resizeThree();
+            this.drawMiniMohr(this.lastCenterRes || { dTauBar: 0, dSnBar: 0, dCfsBar: 0 });
+          }
+        });
+        ro.observe(document.getElementById('c3d-three-wrap'));
+        ro.observe(document.getElementById('c3d-mini-wrap'));
+
+        this.syncLabels();
+        this.recomputeAndUpdate();
+      },
+
+      applyPreset(type) {
+        if (type === 'strike-slip') {
+          Object.assign(this.state, {
+            sStrike: 90, sDip: 90, sRake: 180, sSlip: 3.0, sLen: 20,
+            rX: 18, rY: 2, rZ: 8, rStrike: 90, rDip: 90, rRake: 180,
+            mu: 0.4, sliceZ: 8
+          });
+        } else if (type === 'reverse') {
+          Object.assign(this.state, {
+            sStrike: 0, sDip: 35, sRake: 90, sSlip: 4.0, sLen: 24,
+            rX: 14, rY: 0, rZ: 10, rStrike: 0, rDip: 35, rRake: 90,
+            mu: 0.4, sliceZ: 10
+          });
+        } else {
+          Object.assign(this.state, {
+            sStrike: 0, sDip: 55, sRake: -90, sSlip: 3.0, sLen: 20,
+            rX: 13, rY: 0, rZ: 8, rStrike: 0, rDip: 55, rRake: -90,
+            mu: 0.4, sliceZ: 8
+          });
+        }
+        for (const [id, key] of [
+          ['c3d-sStrike','sStrike'], ['c3d-sDip','sDip'], ['c3d-sRake','sRake'],
+          ['c3d-sSlip','sSlip'], ['c3d-sLen','sLen'], ['c3d-rX','rX'],
+          ['c3d-rY','rY'], ['c3d-rZ','rZ'], ['c3d-rStrike','rStrike'],
+          ['c3d-rDip','rDip'], ['c3d-rRake','rRake'], ['c3d-mu','mu'], ['c3d-sliceZ','sliceZ']
+        ]) {
+          document.getElementById(id).value = this.state[key];
+        }
+        this.syncLabels();
+        this.dirty = true;
+      },
+
+      syncLabels() {
+        const s = this.state;
+        document.getElementById('c3d-val-sStrike').textContent = `${s.sStrike}°`;
+        document.getElementById('c3d-val-sDip').textContent = `${s.sDip}°`;
+        document.getElementById('c3d-val-sRake').textContent = `${s.sRake}°`;
+        document.getElementById('c3d-val-sSlip').textContent = `${s.sSlip.toFixed(1)} m`;
+        document.getElementById('c3d-val-sLen').textContent = `${s.sLen} km`;
+        document.getElementById('c3d-val-rX').textContent = `${s.rX} km`;
+        document.getElementById('c3d-val-rY').textContent = `${s.rY} km`;
+        document.getElementById('c3d-val-rZ').textContent = `${s.rZ} km`;
+        document.getElementById('c3d-val-rStrike').textContent = `${s.rStrike}°`;
+        document.getElementById('c3d-val-rDip').textContent = `${s.rDip}°`;
+        document.getElementById('c3d-val-rRake').textContent = `${s.rRake}°`;
+        document.getElementById('c3d-val-mu').textContent = `${s.mu.toFixed(2)}`;
+        document.getElementById('c3d-val-sliceZ').textContent = `${s.sliceZ} km`;
+      },
+
+      // =======================================================================
+      // 三维弹性位错双力偶叠加引擎 (全空间均匀弹性体 ν=0.25, G=30 GPa)
+      // 坐标系：地理 (E, N, U)，其中 U = -Depth (地表为 U=0)
+      // =======================================================================
+      buildSubfaults() {
+        const { sStrike, sDip, sRake, sSlip, sLen } = this.state;
+        const sW = Math.max(8, Math.min(16, sLen * 0.55));
+        const sCenterU = -8.0; // 源断层中心深度 8 km
+        const { strikeVec, downDipVec, normalVec, slipVec } = faultVectorsGeo(sStrike, sDip, sRake);
+
+        const nx = 6, nw = 3; // 18 个子断层网格点
+        const dL = sLen / nx;
+        const dW = sW / nw;
+        const dA = dL * dW; // km^2
+
+        // 单位换算系数：G = 30 GPa = 3e10 Pa; dA(km^2)*1e6 / r(km)^3*1e9 = 1e-3
+        // => 3e10 * 1e-3 Pa = 3e7 Pa = 300 bar
+        // 乘以 1 / (8*pi*(1-nu))，nu=0.25 => 1 / (6*pi)
+        const factorBar = (300.0 * sSlip * dA) / (6.0 * Math.PI);
+
+        // 对称无迹双力偶矩张量 M_pq = factorBar * (u_p n_q + u_q n_p)
+        const u = slipVec, n = normalVec;
+        const Mxx = factorBar * (2 * u[0] * n[0]);
+        const Myy = factorBar * (2 * u[1] * n[1]);
+        const Mzz = factorBar * (2 * u[2] * n[2]);
+        const Mxy = factorBar * (u[0] * n[1] + u[1] * n[0]);
+        const Mxz = factorBar * (u[0] * n[2] + u[2] * n[0]);
+        const Myz = factorBar * (u[1] * n[2] + u[2] * n[1]);
+
+        this.subfaults = [];
+        for (let ix = 0; ix < nx; ix++) {
+          const along = -sLen / 2 + (ix + 0.5) * dL;
+          for (let iw = 0; iw < nw; iw++) {
+            const downdip = -sW / 2 + (iw + 0.5) * dW;
+            const px = along * strikeVec[0] + downdip * downDipVec[0];
+            const py = along * strikeVec[1] + downdip * downDipVec[1];
+            const pz = sCenterU + along * strikeVec[2] + downdip * downDipVec[2];
+            this.subfaults.push({ px, py, pz, Mxx, Myy, Mzz, Mxy, Mxz, Myz });
+          }
+        }
+        return { sW, sCenterU, strikeVec, downDipVec, normalVec, slipVec };
+      },
+
+      // 计算空间点 (x, y, u) 处的完整三维应力变化张量 (单位：bar，拉张为正)
+      evalStressTensorBar(x, y, u) {
+        let sxx = 0, syy = 0, szz = 0, sxy = 0, sxz = 0, syz = 0;
+        const softSq = 3.2; // 避免奇点的软化半径平方 (km^2)
+
+        for (let i = 0; i < this.subfaults.length; i++) {
+          const sf = this.subfaults[i];
+          const dx = x - sf.px;
+          const dy = y - sf.py;
+          const dz = u - sf.pz;
+          const r2 = dx * dx + dy * dy + dz * dz + softSq;
+          const r = Math.sqrt(r2);
+          const invR = 1.0 / r;
+          const invR3 = invR / r2;
+
+          const gx = dx * invR, gy = dy * invR, gz = dz * invR;
+
+          // V_i = M_{iq} * gamma_q
+          const Vx = sf.Mxx * gx + sf.Mxy * gy + sf.Mxz * gz;
+          const Vy = sf.Mxy * gx + sf.Myy * gy + sf.Myz * gz;
+          const Vz = sf.Mxz * gx + sf.Myz * gy + sf.Mzz * gz;
+
+          // S = M_{pq} * gamma_p * gamma_q = V . gamma
+          const S = Vx * gx + Vy * gy + Vz * gz;
+
+          // ν = 0.25 => (2-4ν)=1, 6ν=1.5, (3-6ν)=1.5, -15S*gi*gj
+          const cS = 1.5 * S;
+          const m15S = -15.0 * S;
+
+          sxx += invR3 * (sf.Mxx + 3.0 * Vx * gx + cS + m15S * gx * gx);
+          syy += invR3 * (sf.Myy + 3.0 * Vy * gy + cS + m15S * gy * gy);
+          szz += invR3 * (sf.Mzz + 3.0 * Vz * gz + cS + m15S * gz * gz);
+          sxy += invR3 * (sf.Mxy + 1.5 * (Vx * gy + Vy * gx) + m15S * gx * gy);
+          sxz += invR3 * (sf.Mxz + 1.5 * (Vx * gz + Vz * gx) + m15S * gx * gz);
+          syz += invR3 * (sf.Myz + 1.5 * (Vy * gz + Vz * gy) + m15S * gy * gz);
+        }
+        return { sxx, syy, szz, sxy, sxz, syz };
+      },
+
+      // 将应力张量投影到接收断层 (nr, ur) 计算 Δτ, Δσn, ΔCFS (bar)
+      projectCoulomb(st, nr, ur, mu) {
+        // Traction T = sigma * nr
+        const Tx = st.sxx * nr[0] + st.sxy * nr[1] + st.sxz * nr[2];
+        const Ty = st.sxy * nr[0] + st.syy * nr[1] + st.syz * nr[2];
+        const Tz = st.sxz * nr[0] + st.syz * nr[1] + st.szz * nr[2];
+
+        const dTauBar = Tx * ur[0] + Ty * ur[1] + Tz * ur[2];
+        const dSnBar = Tx * nr[0] + Ty * nr[1] + Tz * nr[2]; // 拉张松绑为正
+        const dCfsBar = dTauBar + mu * dSnBar;
+        return { dTauBar, dSnBar, dCfsBar };
+      },
+
+      initThree() {
+        const container = document.getElementById('c3d-three-wrap');
+        this.scene = new THREE.Scene();
+        this.scene.background = new THREE.Color(0x020617);
+
+        this.camera = new THREE.PerspectiveCamera(44, 1, 0.5, 400);
+        this.camera.position.set(36, 34, 46);
+
+        this.renderer = new THREE.WebGLRenderer({ antialias: true });
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        container.appendChild(this.renderer.domElement);
+
+        this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+        this.controls.enableDamping = true;
+        this.controls.dampingFactor = 0.08;
+        this.controls.target.set(4, -7, 0);
+        this.controls.minDistance = 15;
+        this.controls.maxDistance = 160;
+
+        this.scene.add(new THREE.AmbientLight(0xffffff, 0.72));
+        const dl = new THREE.DirectionalLight(0xffffff, 0.75);
+        dl.position.set(30, 50, 35);
+        this.scene.add(dl);
+
+        // 地表网格 (Z = 0 => Three.js Y = 0)，尺寸 80x80 km
+        const grid = new THREE.GridHelper(80, 16, 0x334155, 0x1e293b);
+        grid.position.y = 0;
+        this.scene.add(grid);
+
+        const surfacePlane = new THREE.Mesh(
+          new THREE.PlaneGeometry(80, 80),
+          new THREE.MeshBasicMaterial({ color: 0x0f172a, transparent: true, opacity: 0.25, side: THREE.DoubleSide, depthWrite: false })
+        );
+        surfacePlane.rotation.x = -Math.PI / 2;
+        this.scene.add(surfacePlane);
+
+        // 地下参考框 (80x80x24 km)
+        const crustBox = new THREE.LineSegments(
+          new THREE.EdgesGeometry(new THREE.BoxGeometry(80, 24, 80)),
+          new THREE.LineBasicMaterial({ color: 0x1e293b, transparent: true, opacity: 0.7 })
+        );
+        crustBox.position.y = -12;
+        this.scene.add(crustBox);
+
+        // 指南针标注 (E, N, Depth)
+        const spE = createTextSprite('东 +X (km)', '#38bdf8'); spE.position.set(43, 1, 0); spE.scale.set(7.5, 3, 1);
+        const spN = createTextSprite('北 +Y (km)', '#34d399'); spN.position.set(0, 1, -43); spN.scale.set(7.5, 3, 1);
+        const spD = createTextSprite('深度 Z', '#94a3b8'); spD.position.set(-42, -12, 42); spD.scale.set(6.5, 2.6, 1);
+        this.scene.add(spE, spN, spD);
+
+        // 源断层与接收断层容器
+        this.sourceGroup = new THREE.Group();
+        this.receiverGroup = new THREE.Group();
+        this.scene.add(this.sourceGroup, this.receiverGroup);
+
+        // 水平库仑应力切片平面 (36x36 网格，逐顶点着色)
+        const seg = 36;
+        const sliceGeo = new THREE.PlaneGeometry(80, 80, seg, seg);
+        sliceGeo.rotateX(-Math.PI / 2); // 躺在 XZ 平面上
+        const count = sliceGeo.attributes.position.count;
+        sliceGeo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(count * 3), 3));
+        const sliceMat = new THREE.MeshBasicMaterial({
+          vertexColors: true,
+          transparent: true,
+          opacity: 0.76,
+          side: THREE.DoubleSide,
+          depthWrite: false
+        });
+        this.sliceMesh = new THREE.Mesh(sliceGeo, sliceMat);
+        this.scene.add(this.sliceMesh);
+
+        this.resizeThree();
+      },
+
+      resetCamera() {
+        if (!this.camera) return;
+        this.camera.position.set(36, 34, 46);
+        this.controls.target.set(4, -7, 0);
+        this.controls.update();
+      },
+
+      resizeThree() {
+        if (!this.renderer) return;
+        const container = document.getElementById('c3d-three-wrap');
+        if (container.clientWidth === 0 || container.clientHeight === 0) return;
+        const w = Math.max(10, container.clientWidth);
+        const h = Math.max(10, container.clientHeight);
+        this.camera.aspect = w / h;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(w, h);
+      },
+
+      // 构建三维矩形断层几何体 (沿 strike 与 downDip 展开，支持自定义分段)
+      buildFaultPlaneGeo(centerGeo, len, wid, strikeVec, downDipVec, segL = 10, segW = 6) {
+        const geo = new THREE.BufferGeometry();
+        const positions = [];
+        const indices = [];
+        for (let iw = 0; iw <= segW; iw++) {
+          const vw = (iw / segW - 0.5) * wid;
+          for (let il = 0; il <= segL; il++) {
+            const vl = (il / segL - 0.5) * len;
+            const e = centerGeo[0] + vl * strikeVec[0] + vw * downDipVec[0];
+            const n = centerGeo[1] + vl * strikeVec[1] + vw * downDipVec[1];
+            const u = centerGeo[2] + vl * strikeVec[2] + vw * downDipVec[2];
+            const p = geoToThree(e, n, u);
+            positions.push(p.x, p.y, p.z);
+          }
+        }
+        for (let iw = 0; iw < segW; iw++) {
+          for (let il = 0; il < segL; il++) {
+            const a = iw * (segL + 1) + il;
+            const b = a + 1;
+            const c = a + (segL + 1);
+            const d = c + 1;
+            indices.push(a, c, b, b, c, d);
+          }
+        }
+        geo.setIndex(indices);
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        geo.computeVertexNormals();
+        return geo;
+      },
+
+      recomputeAndUpdate() {
+        const s = this.state;
+        const srcInfo = this.buildSubfaults();
+        const recVecs = faultVectorsGeo(s.rStrike, s.rDip, s.rRake);
+
+        // 1. 更新源断层 3D 模型
+        while (this.sourceGroup.children.length > 0) this.sourceGroup.remove(this.sourceGroup.children[0]);
+        const srcCenter = [0, 0, srcInfo.sCenterU];
+        const srcGeo = this.buildFaultPlaneGeo(srcCenter, s.sLen, srcInfo.sW, srcInfo.strikeVec, srcInfo.downDipVec, 6, 3);
+        const srcMat = new THREE.MeshStandardMaterial({
+          color: 0xe2e8f0,
+          emissive: 0x475569,
+          emissiveIntensity: 0.25,
+          transparent: true,
+          opacity: 0.82,
+          side: THREE.DoubleSide
+        });
+        this.sourceGroup.add(new THREE.Mesh(srcGeo, srcMat));
+        this.sourceGroup.add(new THREE.LineSegments(
+          new THREE.WireframeGeometry(srcGeo),
+          new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7 })
+        ));
+
+        // 源断层滑动大箭头
+        const sArrow = createThickArrow(0xfacc15, 0.32, 0.85, 2.0);
+        const sArrowDir = geoToThree(srcInfo.slipVec[0], srcInfo.slipVec[1], srcInfo.slipVec[2]);
+        const sNormOff = geoToThree(srcInfo.normalVec[0], srcInfo.normalVec[1], srcInfo.normalVec[2]).multiplyScalar(0.8);
+        const sOrigin = geoToThree(0, 0, srcInfo.sCenterU).add(sNormOff).addScaledVector(sArrowDir, -3.5);
+        sArrow.position.copy(sOrigin);
+        sArrow.setDirection(sArrowDir);
+        sArrow.setLength(7.0);
+        this.sourceGroup.add(sArrow);
+
+        // 2. 更新接收断层 3D 模型 (逐顶点计算 ΔCFS 着色)
+        while (this.receiverGroup.children.length > 0) this.receiverGroup.remove(this.receiverGroup.children[0]);
+        const rLen = 14, rWid = 8;
+        const recCenter = [s.rX, s.rY, -s.rZ];
+        const recGeo = this.buildFaultPlaneGeo(recCenter, rLen, rWid, recVecs.strikeVec, recVecs.downDipVec, 10, 6);
+        const posAttr = recGeo.attributes.position;
+        const rColors = new Float32Array(posAttr.count * 3);
+        for (let i = 0; i < posAttr.count; i++) {
+          const tx = posAttr.getX(i), ty = posAttr.getY(i), tz = posAttr.getZ(i);
+          // Three.js -> 地理 (E=X, N=-Z, U=Y)
+          const st = this.evalStressTensorBar(tx, -tz, ty);
+          const { dCfsBar } = this.projectCoulomb(st, recVecs.normalVec, recVecs.slipVec, s.mu);
+          const [r, g, b] = divergingColorRGB(dCfsBar, 2.0);
+          rColors[i * 3] = r; rColors[i * 3 + 1] = g; rColors[i * 3 + 2] = b;
+        }
+        recGeo.setAttribute('color', new THREE.BufferAttribute(rColors, 3));
+        const recMat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
+        this.receiverGroup.add(new THREE.Mesh(recGeo, recMat));
+        this.receiverGroup.add(new THREE.LineSegments(
+          new THREE.EdgesGeometry(recGeo, 20),
+          new THREE.LineBasicMaterial({ color: 0xfef08a })
+        ));
+
+        // 接收断层滑动方向箭头
+        const rArrow = createThickArrow(0x38bdf8, 0.25, 0.65, 1.6);
+        const rArrowDir = geoToThree(recVecs.slipVec[0], recVecs.slipVec[1], recVecs.slipVec[2]);
+        const rNormOff = geoToThree(recVecs.normalVec[0], recVecs.normalVec[1], recVecs.normalVec[2]).multiplyScalar(0.7);
+        const rOrigin = geoToThree(s.rX, s.rY, -s.rZ).add(rNormOff).addScaledVector(rArrowDir, -2.8);
+        rArrow.position.copy(rOrigin);
+        rArrow.setDirection(rArrowDir);
+        rArrow.setLength(5.6);
+        this.receiverGroup.add(rArrow);
+
+        // 3. 更新水平库仑应力切片平面
+        this.sliceMesh.visible = s.showSlice;
+        if (s.showSlice) {
+          this.sliceMesh.position.y = -s.sliceZ;
+          const sPos = this.sliceMesh.geometry.attributes.position;
+          const sCol = this.sliceMesh.geometry.attributes.color;
+          const uSlice = -s.sliceZ;
+          for (let i = 0; i < sPos.count; i++) {
+            const gx = sPos.getX(i);
+            const gy = -sPos.getZ(i); // North = -Z
+            const st = this.evalStressTensorBar(gx, gy, uSlice);
+            const { dCfsBar } = this.projectCoulomb(st, recVecs.normalVec, recVecs.slipVec, s.mu);
+            const [r, g, b] = divergingColorRGB(dCfsBar, 2.0);
+            sCol.setXYZ(i, r, g, b);
+          }
+          sCol.needsUpdate = true;
+        }
+
+        // 4. 计算接收断层中心点指标并更新 UI
+        const centerSt = this.evalStressTensorBar(s.rX, s.rY, -s.rZ);
+        const centerRes = this.projectCoulomb(centerSt, recVecs.normalVec, recVecs.slipVec, s.mu);
+        this.lastCenterRes = centerRes;
+        this.updateDashboard(centerRes);
+        this.drawMiniMohr(centerRes);
+      },
+
+      updateDashboard(res) {
+        const fmtBar = (v) => `${v >= 0 ? '+' : ''}${v.toFixed(2)} bar`;
+        const fmtMpa = (v) => `${v >= 0 ? '+' : ''}${(v * 0.1).toFixed(3)} MPa`;
+
+        const cfsEl = document.getElementById('c3d-out-cfs-bar');
+        cfsEl.textContent = fmtBar(res.dCfsBar);
+        cfsEl.className = `text-base font-mono font-bold ${res.dCfsBar >= 0 ? 'text-rose-400' : 'text-sky-400'}`;
+        document.getElementById('c3d-out-cfs-mpa').textContent = fmtMpa(res.dCfsBar);
+
+        document.getElementById('c3d-out-tau-bar').textContent = fmtBar(res.dTauBar);
+        document.getElementById('c3d-out-tau-mpa').textContent = fmtMpa(res.dTauBar);
+        document.getElementById('c3d-out-sn-bar').textContent = fmtBar(res.dSnBar);
+        document.getElementById('c3d-out-sn-mpa').textContent = fmtMpa(res.dSnBar);
+
+        const badge = document.getElementById('c3d-risk-badge');
+        const title = document.getElementById('c3d-risk-title');
+        const sub = document.getElementById('c3d-risk-sub');
+        if (res.dCfsBar >= 0.1) {
+          badge.className = 'rounded-xl px-3 py-2.5 text-center border bg-rose-500/15 border-rose-500/45 text-rose-300';
+          title.textContent = '触发破裂风险显著增加 (应力加载)';
+          sub.textContent = 'ΔCFS ≥ +0.1 bar，已超过典型地震触发阈值';
+        } else if (res.dCfsBar > 0) {
+          badge.className = 'rounded-xl px-3 py-2.5 text-center border bg-amber-500/15 border-amber-500/45 text-amber-300';
+          title.textContent = '轻微应力加载 (略微靠近破裂)';
+          sub.textContent = '0 < ΔCFS < +0.1 bar，触发效应较弱';
+        } else {
+          badge.className = 'rounded-xl px-3 py-2.5 text-center border bg-sky-500/15 border-sky-500/45 text-sky-300';
+          title.textContent = '处于应力影区 (抑制破裂)';
+          sub.textContent = 'ΔCFS < 0，断层远离破裂极限，相对更安全';
+        }
+      },
+
+      // 迷你莫尔空间应力转移示意图
+      drawMiniMohr(res) {
+        const canvas = document.getElementById('c3d-mini-canvas');
+        const wrap = document.getElementById('c3d-mini-wrap');
+        const { ctx, w, h } = setupCanvasDPR(canvas, wrap);
+        ctx.clearRect(0, 0, w, h);
+
+        const pad = { l: 34, r: 16, t: 18, b: 26 };
+        const pw = w - pad.l - pad.r;
+        const ph = h - pad.t - pad.b;
+        if (pw <= 10 || ph <= 10) return;
+        // 坐标轴 (横轴：挤压正应力 σn，向右压紧；纵轴：剪应力 τ，向上增大)
+        ctx.strokeStyle = '#64748b';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(pad.l, h - pad.b); ctx.lineTo(w - pad.r, h - pad.b);
+        ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, h - pad.b);
+        ctx.stroke();
+
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '10px Inter, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText('挤压正应力 σn →', w - pad.r, h - 8);
+        ctx.textAlign = 'left';
+        ctx.fillText('τ', pad.l + 5, pad.t + 8);
+
+        // 库仑破裂包络线 (斜率 = μ')
+        const mu = this.state.mu;
+        const x0 = pad.l, y0 = h - pad.b - ph * 0.42;
+        const x1 = w - pad.r, y1 = y0 - pw * mu * 0.55;
+
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.12)';
+        ctx.beginPath();
+        ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.lineTo(x1, pad.t); ctx.lineTo(x0, pad.t);
+        ctx.closePath(); ctx.fill();
+
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+        ctx.fillStyle = '#fca5a5';
+        ctx.fillText(`库仑破裂线 (斜率 μ'=${mu.toFixed(2)})`, pad.l + 8, pad.t + 14);
+
+        // 接收断层初始参考点 P0
+        const p0x = pad.l + pw * 0.52;
+        const p0y = h - pad.b - ph * 0.34;
+
+        // 应力转移向量：注意莫尔圆中“拉张松绑(Δσn > 0)”是向左平移！“Δτ > 0”是向上平移！
+        const maxShift = Math.min(pw, ph) * 0.28;
+        const scale = maxShift / Math.max(1.8, Math.hypot(res.dSnBar, res.dTauBar));
+        const dx = -res.dSnBar * scale; // 拉张为正 -> 向左移动
+        const dy = -res.dTauBar * scale; // Canvas Y 向下，故 Δτ > 0 向上移动
+
+        const p1x = Math.max(pad.l + 8, Math.min(w - pad.r - 8, p0x + dx));
+        const p1y = Math.max(pad.t + 8, Math.min(h - pad.b - 8, p0y + dy));
+
+        // 初始点 P0
+        ctx.fillStyle = '#94a3b8';
+        ctx.beginPath(); ctx.arc(p0x, p0y, 4, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#cbd5e1';
+        ctx.font = '10px Inter, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText('震前状态', p0x + 7, p0y + 12);
+
+        // 转移箭头 P0 -> P1
+        const col = res.dCfsBar >= 0 ? '#f43f5e' : '#38bdf8';
+        Mohr2D.drawArrow2D(ctx, p0x, p0y, p1x, p1y, col, 2.5, 8);
+
+        // 震后点 P1
+        ctx.fillStyle = col;
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(p1x, p1y, 4.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = res.dCfsBar >= 0 ? '#fda4af' : '#7dd3fc';
+        ctx.fillText(res.dCfsBar >= 0 ? '震后(靠近破裂)' : '震后(远离破裂)', p1x + 7, p1y - 4);
+      },
+
+      renderLoop() {
+        if (!this.renderer) return;
+        if (this.dirty) {
+          this.dirty = false;
+          this.recomputeAndUpdate();
+        }
+        this.controls.update();
+        this.renderer.render(this.scene, this.camera);
+      }
+    };
+
+    // =========================================================================
+    // 主应用控制器 (标签切换、统一动画循环)
+    // =========================================================================
+    const App = {
+      activeTab: 'mohr2d',
+      lastTime: performance.now(),
+
+      init() {
+        Mohr2D.init();
+        Mohr3D.init();
+        Coulomb3D.init();
+        this.animate(performance.now());
+      },
+
+      switchTab(tab) {
+        this.activeTab = tab;
+        const tabs = ['mohr2d', 'mohr3d', 'coulomb3d'];
+        tabs.forEach((t) => {
+          const sec = document.getElementById(`tab-${t}`);
+          const btn = document.getElementById(`btn-tab-${t}`);
+          if (t === tab) {
+            sec.classList.remove('hidden');
+            sec.classList.add('grid');
+            btn.classList.add('tab-btn-active');
+            btn.classList.remove('bg-slate-900/60');
+          } else {
+            sec.classList.add('hidden');
+            sec.classList.remove('grid');
+            btn.classList.remove('tab-btn-active');
+            btn.classList.add('bg-slate-900/60');
+          }
+        });
+
+        // 切换标签后立即刷新尺寸与画面
+        requestAnimationFrame(() => {
+          if (tab === 'mohr2d') {
+            Mohr2D.render();
+          } else if (tab === 'mohr3d') {
+            Mohr3D.resizeThree();
+            Mohr3D.drawMohr3D(Mohr3D.compute());
+          } else if (tab === 'coulomb3d') {
+            Coulomb3D.resizeThree();
+            Coulomb3D.drawMiniMohr(Coulomb3D.lastCenterRes || { dTauBar: 0, dSnBar: 0, dCfsBar: 0 });
+          }
+        });
+      },
+
+      animate(now) {
+        requestAnimationFrame((t) => this.animate(t));
+        const dt = Math.min(0.05, (now - this.lastTime) / 1000);
+        this.lastTime = now;
+
+        if (this.activeTab === 'mohr2d') {
+          Mohr2D.tick(dt);
+        } else if (this.activeTab === 'mohr3d') {
+          Mohr3D.renderLoop();
+        } else if (this.activeTab === 'coulomb3d') {
+          Coulomb3D.renderLoop();
+        }
+      }
+    };
+
+    window.addEventListener('DOMContentLoaded', () => App.init());
+  </script>
+</body>
+</html>
