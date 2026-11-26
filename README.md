@@ -2,7 +2,7 @@
 
 > **Geophysics & Rock Mechanics Interactive Lab · 2D/3D Mohr Circle & 3D** $\Delta CFS$
 >
-> 🌐 **在线体验 (Live Demo)**：[点击直接运行实验室](https://hsiaolung.github.io/coulomb-mohr-lab/)（开启 GitHub Pages 并将主文件命名为 `index.html` 后生效）
+> 🌐 **在线体验 (Live Demo)**：[点击直接运行实验室](https://hsiaolung.github.io/coulomb-mohr-lab/)
 
 一个**单文件、零构建依赖**的地球物理与岩石力学交互式可视化实验室。通过实时联动的 2D/3D 图形界面，帮助地震学、构造地质学与岩石力学初学者直观理解**二维/三维应力莫尔圆**、**孔隙水压诱发地震机制**以及**三维空间静态库仑破裂应力变化（**$\Delta CFS$**）**。
 
